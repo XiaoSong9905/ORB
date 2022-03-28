@@ -355,13 +355,67 @@ void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv:
 
 }
 
+int getValue(int i, float cosine, float sine){
+    int xPrime = cvRound(pattern[i].x * cosine - pattern[i].y * sine)
+    int yPrime = cvRound(pattern[i].x * sine + pattern[i].y * cosine);
+    return center[yPrime * step + xPrime];    
+}
 
 void ORBDetectorDescriptor::computeDescriptors( const cv::Mat& image, \
                                                 std::vector<cv::KeyPoint>& keypoints, \
-                                                cv::Mat& descriptors )
+                                                cv::Mat& descriptors, \
+                                                const vector<Point>& pattern )
 {
     // NOTE: when implementing, you should merge `ORBextractor.cc computeDescriptors` \
     //  and `ORBextractor.cc computeOrbDescriptor` to this one single function
+    descriptors = Mat::zeros(keypoints.size(), 32, CV_8UC1);
+
+    const float factorPi = (float)(CV_PI/180.0);
+    for (int i=0; i<keypoints.size(); ++i){
+
+        // get the angle of the keypoint (and get the cos and sin value)
+        float angle = (float)keypoints[i].angle * factorPi;
+        float cosine = (float)cos(angle), sine = (float)sin(angle);
+
+        // get the center of the image
+        const uchar* center = &image.at<uchar>(cvRound(kpt.pt.y), cvRound(kpt.pt.x));
+        const int step = (int)image.step;
+
+        // brief descriptors are 32 x 8bit
+        // need 16 random points for 8 bit comparison
+        for (int j=0; j<32; ++j, pattern+=16)
+        {
+            
+            int t0, t1, val;
+            
+            t0 = getValue(0, cosine, sine); 
+            t1 = getValue(1, cosine, sine);
+            val = t0 < t1;							
+            t0 = getValue(2, cosine, sine); 
+            t1 = getValue(3, cosine, sine);
+            val |= (t0 < t1) << 1;					
+            t0 = getValue(4, cosine, sine); 
+            t1 = getValue(5, cosine, sine);
+            val |= (t0 < t1) << 2;					
+            t0 = getValue(6, cosine, sine); 
+            t1 = getValue(7, cosine, sine);
+            val |= (t0 < t1) << 3;					
+            t0 = getValue(8, cosine, sine); 
+            t1 = getValue(9, cosine, sine);
+            val |= (t0 < t1) << 4;					
+            t0 = getValue(10, cosine, sine); 
+            t1 = getValue(11, cosine, sine);
+            val |= (t0 < t1) << 5;					
+            t0 = getValue(12, cosine, sine); 
+            t1 = getValue(13, cosine, sine);
+            val |= (t0 < t1) << 6;					
+            t0 = getValue(14, cosine, sine); 
+            t1 = getValue(15, cosine, sine);
+            val |= (t0 < t1) << 7;				
+
+            descriptors[i][j] = (uchar)val;
+        }
+    }
 }
 
 
