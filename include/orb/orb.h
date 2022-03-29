@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <opencv2/features2d.hpp>
+#include <opencv2/opencv.hpp>
 
 namespace orb
 {
@@ -15,13 +15,13 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * 
          * @param param-name param-content
          */
-        ORBDetectorDescriptor( /* TODO: add parameter as needed */ );
+        ORBDetectorDescriptor( ) = default;
 
         /**
          * @brief Destroy the ORBDetectorDescriptor object
          * 
          */
-        virtual ~ORBDetectorDescriptor();
+        virtual ~ORBDetectorDescriptor() = default;
 
         /**
          * @brief Detect keypoint and compute the descriptor
@@ -46,50 +46,8 @@ class ORBDetectorDescriptor : public cv::Feature2D
                                        cv::OutputArray descriptors, \
                                        bool useProvidedKeypoints=false ) override;
 
-        /**
-         * @brief Getname of this extractor, used in some opencv funciton
-         * 
-         * @return std::string 
-         */
-        virtual std::string getDefaultName() const override;
-    
-    protected:
-        // TODO add helper function & helper member varaible here
-        
-        // Number of pyramid layer
-        int nPyramidLayer;
-
-        // Image at each pyramid level
-        std::vector<cv::Mat> imagePyramid;
-
-        // BRISK random pattern
-        std::vector<cv::point> briskPattern;
-
-        /**
-         * @brief Build image pyramic
-         * 
-         * @param image Source image of original size
-         */
-        void computePyramid( const cv::Mat& image );
-
-        /**
-         * @brief Compute key point on every pyramid level using quad tree approach
-         * 
-         * @param keypointsPyramid keypoints per each pyramid level
-         */
-        void computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid );
-
-        /**
-         * @brief Compute descriptor for each pyramic layer
-         * 
-         * @param image Image at specific pyramid layer
-         * @param keypoints Keypoints detected at that layer
-         * @param descriptors output descriptors
-         */
-        void computeDescriptors( const cv::Mat& image, \
-                                 std::vector<cv::KeyPoint>& keypoints, \
-                                 cv::Mat& descriptors );
-
+    private:
+        cv::Ptr<cv::ORB> orb_opencv = cv::ORB::create();
 };
 
 };
