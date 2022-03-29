@@ -6,6 +6,10 @@
 namespace orb
 {
 
+    // For computerPyramid
+    const int EDGE_THRESHOLD = 19;
+
+
 // From OpenCV ORB
 static int bit_pattern_31_[256*4] =
 {
@@ -272,6 +276,12 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( /* TODO: add parameter as needed *
 {
     // TODO: add initialization related here
 
+
+
+    // For computePyramid
+    invScaleFactor.resize(nPyramidLayers);
+
+
 }
 
 
@@ -346,10 +356,34 @@ std::string ORBDetectorDescriptor::getDefaultName() const
 
 void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 {
+    for (int layer = 0; layer < nPyramidLayers; ++layer) {
+        float scale = invScaleFactor[layer];
+
+        // Probably meant cv::Size...
+        cv::Size sz(cv::cvRound((float) image.cols * scale), cv::cvRound((float) image.rows * scale)); // sz is the variable name...
+
+        cv::Size wholeSize(sz.width + EDGE_THRESHOLD*2, sz.height + EDGE_THRESHOLD*2);
+
+        cv::Mat temp(wholeSize, image.type());
+        cv::Mat maskTemp;
+        imagePyramid[layer] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+
+        // Compute the resized image
+        if (layer != 0) {
+            cv::resize(imagePyramid[layer-1], imagePyramid[layer], sz, 0, 0, cv::INTER_LINEAR);
+
+            // This is just an opencv function... that adds borders to the image
+            // The cv::BORDER_REFLECT_101 and stuff are border types enums
+            cv::copyMakeBorder(imagePyramid[layer], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, cv::BORDER_REFLECT_101+cv::BORDER_ISOLATED);
+        }
+        else {
+            copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, BORDER_REFLECT_101);
+        }
+    }
 
 }
 
-
+// So we're doing quad tree not oct tree?
 void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid )
 {
 
