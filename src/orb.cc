@@ -2,9 +2,15 @@
 #include <string>
 #include <vector>
 #include <orb/orb.h>
+#include <opencv2/core/core.hpp>
 
 namespace orb
 {
+
+// some hyperparameter use to determine the size of image pyramid generation
+const int PATCH_SIZE = 31;
+const int HALF_PATCH_SIZE = 15;
+const int EDGE_SIZE = 19;
 
 // From OpenCV ORB
 static int bit_pattern_31_[256*4] =
@@ -349,9 +355,72 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 
 }
 
-
-void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid )
+/**
+ * @brief Compute key point on every pyramid level using quad tree approach
+ *
+ * @param keypointsPyramid: a vector of vectors. The first dimension represents the layers of 
+ *                          the computed image pyramid, while the inner vectors contains the 
+ *                          actual key points located at that layer.
+ */
+void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>> &  keypointsPyramid )
 {
+    keypointsPyramid.resize(nPyramidLayer);
+    const float W = 30;
+
+    // itr through the whole pyramid and process each layer.
+    for (int i = 0; i < nPyramidLayer; i++) 
+    {
+        // get the valid image area of current layer
+        const int minX = EDGE_SIZE - 3;     // 3 is the radius set for the FAST calculation 
+        const int minY = EDGE_SIZE - 3;
+        const int maxX = imagePyramid[i].cols - minX;
+        const int maxY = imagePyramid[i].rows - minX;
+
+        const float width = maxX - minX;
+        const float height = maxY - minY;
+
+        // get the amount of grids we have within current layer
+        const int gridCols = width / W;
+        const int gridRows = height / W;
+
+        // calculate the size of each grid
+        const int girdWidth = std::ceil(width / gridCols);
+        const int gridHeight = std::ceil(height / gridRows);
+
+        // reserve extra space for keypoints
+        std::vector<cv::KeyPoint> keypointsToDistribute;
+        keypointsToDistribute.reserve(featureAmountTarget * 10);
+
+        // traverse all the grids
+        for (int r = 0; r < gridRows; r++)
+        {
+
+            for (int c = 0; c < gridCols; c++)
+            {
+
+            }
+        }
+
+        // store a reference to all the keypoints that belongs to the current layer
+        std::vector<cv::KeyPoint>& currentKeypoints = keypointsPyramid[i];
+        currentKeypoints.reserve(featureAmountTarget);
+
+        // TODO:: a function here to re-distribute the points into oct tree
+        // currentKeypoints = ;
+
+        // traverse all feature points and restore their coordinates under current layer
+        for (int k = 0; k < currentKeypoints.size(); k++)
+        {
+            currentKeypoints[k].pt.x += minX;
+            currentKeypoints[k].pt.y += minY;
+
+            currentKeypoints[k].octave = i;
+            currentKeypoints[k].size = PATCH_SIZE * 
+        }
+
+
+
+    }
 
 }
 
@@ -364,5 +433,11 @@ void ORBDetectorDescriptor::computeDescriptors( const cv::Mat& image, \
     //  and `ORBextractor.cc computeOrbDescriptor` to this one single function
 }
 
+
+// TODO:: finish this
+void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4)
+{
+
+}
 
 } // namespace orb
