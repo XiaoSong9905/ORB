@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
@@ -6,6 +6,37 @@
 
 namespace orb
 {
+
+class QuadTreeNode
+{
+public:
+	// a list of all keypoints belongs to this node
+	std::vector<cv::KeyPoint> keypoints;
+
+    // boundaries of this node
+	cv::Point2i UL, UR, BL, BR;
+
+    // iterator over all quad tree nodes.
+    std::list<QuadTreeNode>::iterator lit;
+
+    // a flag used to determine if a node already entered its final status.
+    bool isFinal;
+
+    /**
+     * @brief The QuadNode constructor
+     */
+    QuadTreeNode() : isFinal(false){}
+
+    /**
+     * @brief Divide the current node into four sub areas.
+     *
+     * @param[in & out] n1   divided node 1
+     * @param[in & out] n2   divided node 2
+     * @param[in & out] n3   divided node 3
+     * @param[in & out] n4   divided node 4
+     */
+    void divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4);
+};
 
 class ORBDetectorDescriptor : public cv::Feature2D
 {
@@ -59,6 +90,12 @@ class ORBDetectorDescriptor : public cv::Feature2D
         // Number of pyramid layer
         int nPyramidLayer;
 
+        // target amount of features we want to extract from one image 
+        int featureAmountTarget;
+
+        // the scaleFactor applied on different layers within the image pyramid.
+        double scaleFactor;
+
         // Image at each pyramid level
         std::vector<cv::Mat> imagePyramid;
 
@@ -77,7 +114,7 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * 
          * @param keypointsPyramid keypoints per each pyramid level
          */
-        void computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid );
+        void computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid ); 
 
         /**
          * @brief Compute descriptor for each pyramic layer
