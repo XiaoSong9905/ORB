@@ -384,7 +384,7 @@ void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv:
         const int gridRows = height / W;
 
         // calculate the size of each grid
-        const int girdWidth = std::ceil(width / gridCols);
+        const int gridWidth = std::ceil(width / gridCols);
         const int gridHeight = std::ceil(height / gridRows);
 
         // reserve extra space for keypoints
@@ -394,10 +394,53 @@ void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv:
         // traverse all the grids
         for (int r = 0; r < gridRows; r++)
         {
+            const float initialRCoord = r * gridHeight + minY;
+            float terminateRCoord = initialRCoord + gridHeight + 6;
+
+            if (initialRCoord > maxY - 3)
+                continue;
+            if (terminateRCoord > maxY)
+                terminateRCoord = maxY;
 
             for (int c = 0; c < gridCols; c++)
             {
+                const float initialCCoord = c * gridWidth + minX;
+                float terminateCCoord = initialCCoord + gridWidth + 6;
 
+                if (initialCCoord > maxX - 3)
+                    continue;
+                if (terminateCCoord > maxX)
+                    terminateCCoord = maxX;
+
+                // a vector, holds all of the keypoints within this grid.
+                std::vector<cv::KeyPoint> gridKeypoints;
+
+                // OpenCV's FAST detector, first try, with higher threshold.
+                FAST(imagePyramid[i].rowRange(initialRCoord, terminateRCoord).colRange(initialCCoord, terminateCCoord),
+                    gridKeypoints,
+                    defaultFASTThreshold,
+                    true
+                );
+
+                if (gridKeypoints.empty())
+				{
+					FAST(imagePyramid[i].rowRange(initialRCoord, terminateRCoord).colRange(initialCCoord, terminateCCoord),
+						gridKeypoints,
+						minFASTThreshold,
+						true
+					);
+				}
+
+                if (!gridKeypoints.empty())
+                {
+                    for (auto vit = gridKeypoints.begin(); vit != gridKeypoints.end(); vit++)
+                    {
+                        vit->pt.x += c * gridWidth;
+                        vit->pt.y += r * gridHeight;
+
+                        keypointsToDistribute.push_back(*vit);
+                    }
+                }
             }
         }
 
@@ -406,7 +449,11 @@ void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv:
         currentKeypoints.reserve(featureAmountTarget);
 
         // TODO:: a function here to re-distribute the points into oct tree
-        // currentKeypoints = ;
+        currentKeypoints = QuadTreeDistribute(keypointsToDistribute,
+                                              minX, maxX,
+                                              minY, maxY,
+                                              targetFeaturePerLevel[i],
+                                              i);
 
         // traverse all feature points and restore their coordinates under current layer
         for (int k = 0; k < currentKeypoints.size(); k++)
@@ -415,11 +462,16 @@ void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv:
             currentKeypoints[k].pt.y += minY;
 
             currentKeypoints[k].octave = i;
-            currentKeypoints[k].size = PATCH_SIZE * 
+            currentKeypoints[k].size = PATCH_SIZE * layerScaleFactors[i];
         }
+    }
 
-
-
+    // TODO:: compute orientations for the key points of each level;
+    // this step must execute AFTER the QUAD tree distribution finished so it cannot be included within 
+    // previous step.
+    for (int i = 0; i < nPyramidLayer; i++)
+    {
+        findOrientation(imagePyramid[i], keypointsPyramid[i], pyramidUBoundaries);
     }
 
 }
@@ -433,6 +485,17 @@ void ORBDetectorDescriptor::computeDescriptors( const cv::Mat& image, \
     //  and `ORBextractor.cc computeOrbDescriptor` to this one single function
 }
 
+// TODO:: finish this, find orientation helper
+void ORBDetectorDescriptor::findOrientation(std::vector<cv::Mat> imagePyramid, std::vector<std::vector<cv::KeyPoint>>& keypointsPyramid, std::vector<int> pyramidUBoundaries)
+{
+
+}
+
+// TODO:: finish this
+std::vector<cv::KeyPoint> ORBDetectorDescriptor::QuadTreeDistribute(const std::vector<cv::KeyPoint>& keypointsToDistribute, const int& minX, const int& maxX, const int& minY, const int& maxY, const int& nFeatures, const int& level)
+{
+
+}
 
 // TODO:: finish this
 void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4)
