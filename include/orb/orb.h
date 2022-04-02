@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <opencv2/features2d.hpp>
 
 namespace orb

@@ -494,7 +494,64 @@ void ORBDetectorDescriptor::findOrientation(std::vector<cv::Mat> imagePyramid, s
 // TODO:: finish this
 std::vector<cv::KeyPoint> ORBDetectorDescriptor::QuadTreeDistribute(const std::vector<cv::KeyPoint>& keypointsToDistribute, const int& minX, const int& maxX, const int& minY, const int& maxY, const int& nFeatures, const int& level)
 {
+    const int nIni = std::round(static_cast<float>(maxX - minX) / (maxY - minY));
+    const float hX = static_cast<float>(maxX - minX) / nIni;
 
+    std::list<QuadTreeNode> nodesList;
+    std::vector<QuadTreeNode*> initialNodesPtrs;
+
+    initialNodesPtrs.resize(nIni);
+
+    // initialize all quad tree nodes and push them into container
+    for (int i = 0; i < nIni; i++)
+    {
+        QuadTreeNode qNode;
+
+        qNode.UL = cv::Point2i(hX * static_cast<float>(i), 0);
+        qNode.UR = cv::Point2i(hX * static_cast<float>(i + 1), 0);
+        qNode.BL = cv::Point2i(qNode.UL.x, maxY - minY);
+        qNode.BR = cv::Point2i(qNode.UR.x, maxY - minY);
+
+        qNode.keypoints.reserve(keypointsToDistribute.size());
+
+        nodesList.push_back(qNode);
+        initialNodesPtrs[i] = &nodesList.back();
+    }
+
+	// link points to child nodes
+    for (int i = 0; i < keypointsToDistribute.size(); i++)
+    {
+        const cv::KeyPoint& kp = keypointsToDistribute[i];
+        initialNodesPtrs[kp.pt.x / hX]->keypoints.push_back(kp);
+    }
+    
+    // traverse the quad tree nodes list, mark the nodes that no longer needs to be split, delete the nodes that did not 
+    // have a keypoint associated with it.
+    auto lit = nodesList.begin();
+    while (lit != nodesList.end())
+    {
+
+    }
+
+    bool bFinish = false;
+
+    std::vector<std::pair<int, QuadTreeNode*>> sizeAndPtr2Node;
+    sizeAndPtr2Node.reserve(nodesList.size() * 4);
+
+    while (!bFinish)
+    {
+
+    }
+
+    std::vector<cv::KeyPoint> resultKeyPoints;
+    resultKeyPoints.reserve(nFeatures);
+
+    for (auto lit = nodesList.begin(); lit != nodesList.end(); lit++)
+    {
+
+    }
+
+    return resultKeyPoints;
 }
 
 // TODO:: finish this
