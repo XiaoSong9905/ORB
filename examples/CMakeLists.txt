@@ -29,9 +29,10 @@ else(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 find_package( OpenCV REQUIRED )
-include_directories( ${OpenCV_INCLUDE_DIRS} )
+include_directories( ${OpenCV_INCLUDE_DIRS})
 
-# TODO include our own ORB package
+find_package( orb REQUIRED )
+include_directories( ${ORB_INCLUDE_DIRS} )
 
-add_executable( demo demo.cpp  )
-target_link_libraries( demo ${OpenCV_LIBS} )
+add_executable( demo demo.cc  )
+target_link_libraries( demo ${OpenCV_LIBS} orb)

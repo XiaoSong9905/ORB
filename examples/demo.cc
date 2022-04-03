@@ -21,8 +21,8 @@ int main ( int argc, char** argv )
         exit(1);
     }
 
-    cv::Mat image1 = cv::imread ( argv[1], CV_LOAD_IMAGE_COLOR );
-    cv::Mat image2 = cv::imread ( argv[2], CV_LOAD_IMAGE_COLOR );
+    cv::Mat image1 = cv::imread ( argv[1], cv::IMREAD_COLOR );
+    cv::Mat image2 = cv::imread ( argv[2], cv::IMREAD_COLOR );
 
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
     cv::Mat descriptors1, descriptors2;

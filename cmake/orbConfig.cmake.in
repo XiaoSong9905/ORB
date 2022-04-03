@@ -1,0 +1,9 @@
+# Compute paths
+get_filename_component(ORB_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(ORB_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+
+
+include(CMakeFindDependencyMacro)
+
+
+include("${CMAKE_CURRENT_LIST_DIR}/orbTargets.cmake")
