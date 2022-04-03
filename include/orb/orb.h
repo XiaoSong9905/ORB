@@ -47,13 +47,13 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * 
          * @param param-name param-content
          */
-        ORBDetectorDescriptor( /* TODO: add parameter as needed */ );
+        ORBDetectorDescriptor( );
 
         /**
          * @brief Destroy the ORBDetectorDescriptor object
          * 
          */
-        virtual ~ORBDetectorDescriptor();
+        virtual ~ORBDetectorDescriptor() = default;
 
         /**
          * @brief Detect keypoint and compute the descriptor
