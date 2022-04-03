@@ -383,7 +383,13 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 
 }
 
-// So we're doing quad tree not oct tree?
+/**
+ * @brief Compute key point on every pyramid level using quad tree approach
+ *
+ * @param keypointsPyramid: a vector of vectors. The first dimension represents the layers of 
+ *                          the computed image pyramid, while the inner vectors contains the 
+ *                          actual key points located at that layer.
+ */
 void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid )
 {
 
