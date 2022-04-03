@@ -84,12 +84,13 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * @return std::string 
          */
         virtual std::string getDefaultName() const override;
+
     
     protected:
         // TODO add helper function & helper member varaible here
         
-        // Number of pyramid layer
-        int nPyramidLayer;
+        // Number of pyramid layers
+        int nPyramidLayers;
 
         // default OpenCV FAST detection threshold
         int defaultFASTThreshold;
@@ -105,6 +106,10 @@ class ORBDetectorDescriptor : public cv::Feature2D
 
         // Image at each pyramid level
         std::vector<cv::Mat> imagePyramid;
+
+        // Other variables used for computePyramid
+        std::vector<float> invScaleFactor;
+
 
         // BRISK random pattern
         std::vector<cv::point> briskPattern;
