@@ -1,11 +1,43 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
+#include <list>
 #include <opencv2/features2d.hpp>
 
 namespace orb
 {
+
+class QuadTreeNode
+{
+public:
+    // a list of all keypoints belongs to this node
+    std::vector<cv::KeyPoint> keypoints;
+
+    // boundaries of this node
+    cv::Point2i UL, UR, BL, BR;
+
+    // iterator over all quad tree nodes.
+    std::list<QuadTreeNode>::iterator lit;
+
+    // a flag used to determine if a node already entered its final status.
+    bool isFinal;
+
+    /**
+     * @brief The QuadNode constructor
+     */
+    QuadTreeNode() : isFinal(false){}
+
+    /**
+     * @brief Divide the current node into four sub areas.
+     *
+     * @param[in & out] n1   divided node 1
+     * @param[in & out] n2   divided node 2
+     * @param[in & out] n3   divided node 3
+     * @param[in & out] n4   divided node 4
+     */
+    void divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4);
+};
 
 class ORBDetectorDescriptor : public cv::Feature2D
 {
@@ -59,11 +91,31 @@ class ORBDetectorDescriptor : public cv::Feature2D
         // Number of pyramid layer
         int nPyramidLayer;
 
+        // default OpenCV FAST detection threshold
+        int defaultFASTThreshold;
+
+        // min OpenCV FAST detection threshold
+        int minFASTThreshold;
+
+        // target amount of features we want to extract from one image 
+        int featureAmountTarget;
+
+        // the scaleFactor applied on different layers within the image pyramid.
+        double scaleFactor;
+
         // Image at each pyramid level
         std::vector<cv::Mat> imagePyramid;
 
         // BRISK random pattern
         std::vector<cv::point> briskPattern;
+
+        // a look-up table for the scale factors of each layer within the pyramid.
+        std::vector<float> layerScaleFactors;
+
+        std::vector<int> targetFeaturePerLevel;
+
+        // a look-up table for U axis boundary size on each level 
+        std::vector<int> pyramidUBoundaries;
 
         /**
          * @brief Build image pyramic
@@ -77,7 +129,7 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * 
          * @param keypointsPyramid keypoints per each pyramid level
          */
-        void computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid );
+        void computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid ); 
 
         /**
          * @brief Compute descriptor for each pyramic layer
@@ -90,6 +142,9 @@ class ORBDetectorDescriptor : public cv::Feature2D
                                  std::vector<cv::KeyPoint>& keypoints, \
                                  cv::Mat& descriptors );
 
+        void findOrientation(std::vector<cv::Mat> imagePyramid, std::vector<std::vector<cv::KeyPoint>>& keypointsPyramid, std::vector<int> pyramidUBoundaries);
+
+        std::vector<cv::KeyPoint> QuadTreeDistribute(const std::vector<cv::KeyPoint>& keypointsToDistribute, const int &minX, const int &maxX, const int &minY, const int &maxY, const int &nFeatures, const int &level);
 };
 
 };
