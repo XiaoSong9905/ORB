@@ -8,16 +8,13 @@
 namespace orb
 {
 
-<<<<<<< HEAD
 // some hyperparameter use to determine the size of image pyramid generation
 const int PATCH_SIZE = 31;
 const int HALF_PATCH_SIZE = 15;
 const int EDGE_SIZE = 19;
-=======
-    // For computerPyramid
-    const int EDGE_THRESHOLD = 19;
 
->>>>>>> nian/pyramid
+// For computerPyramid
+const int EDGE_THRESHOLD = 19;
 
 // From OpenCV ORB
 static int bit_pattern_31_[256*4] =
@@ -284,20 +281,12 @@ static int bit_pattern_31_[256*4] =
 ORBDetectorDescriptor::ORBDetectorDescriptor( /* TODO: add parameter as needed */  )
 {
     // TODO: add initialization related here
-
-
-
     // For computePyramid
     invScaleFactor.resize(nPyramidLayers);
-
-
 }
 
 
-ORBDetectorDescriptor::~ORBDetectorDescriptor()
-{
-
-}
+ORBDetectorDescriptor::~ORBDetectorDescriptor() = default;
 
 
 void OrbFeatureDetector::detectAndCompute( cv::InputArray _image, \
@@ -363,6 +352,11 @@ std::string ORBDetectorDescriptor::getDefaultName() const
 }
 
 
+/**
+ * @brief Build image pyramic
+ * 
+ * @param image Source image of original size
+ */
 void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 {
     for (int layer = 0; layer < nPyramidLayers; ++layer) {
@@ -513,12 +507,20 @@ void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv:
 
 }
 
+
 int getValue(int i, float cosine, float sine){
     int xPrime = cvRound(pattern[i].x * cosine - pattern[i].y * sine)
     int yPrime = cvRound(pattern[i].x * sine + pattern[i].y * cosine);
     return center[yPrime * step + xPrime];    
 }
 
+/**
+ * @brief Compute descriptor for each pyramic layer
+ * 
+ * @param image Image at specific pyramid layer
+ * @param keypoints Keypoints detected at that layer
+ * @param descriptors output descriptors
+ */
 void ORBDetectorDescriptor::computeDescriptors( const cv::Mat& image, \
                                                 std::vector<cv::KeyPoint>& keypoints, \
                                                 cv::Mat& descriptors, \
@@ -581,6 +583,7 @@ void ORBDetectorDescriptor::findOrientation(std::vector<cv::Mat> imagePyramid, s
 {
 
 }
+
 
 // TODO:: finish this
 std::vector<cv::KeyPoint> ORBDetectorDescriptor::QuadTreeDistribute(const std::vector<cv::KeyPoint>& keypointsToDistribute, const int& minX, const int& maxX, const int& minY, const int& maxY, const int& nFeatures, const int& level)
