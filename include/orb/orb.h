@@ -15,7 +15,7 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * 
          * @param param-name param-content
          */
-        ORBDetectorDescriptor( ) = default;
+        ORBDetectorDescriptor( );
 
         /**
          * @brief Destroy the ORBDetectorDescriptor object

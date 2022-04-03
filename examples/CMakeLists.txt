@@ -33,6 +33,7 @@ include_directories( ${OpenCV_INCLUDE_DIRS})
 
 find_package( orb REQUIRED )
 include_directories( ${ORB_INCLUDE_DIRS} )
+message( STATUS "Found ORB: ${ORB_INCLUDE_DIRS}")
 
 add_executable( demo demo.cc  )
 target_link_libraries( demo ${OpenCV_LIBS} orb)
