@@ -1,22 +1,21 @@
 #include <cassert>
 #include <string>
 #include <vector>
-
-#include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 #include <orb/orb.h>
 
 namespace orb
 {
 
 // some hyperparameter use to determine the size of image pyramid generation
-const int PATCH_SIZE = 31;
-const int HALF_PATCH_SIZE = 15;
-const int EDGE_SIZE = 19;
+constexpr int EXTRACTOR_PATCH_SIZE = 31;
+constexpr int HALF_EXTRACTOR_PATCH_SIZE = 15;
 
-// For computerPyramid
-const int EDGE_THRESHOLD = 19;
+// Edge for compute image pyramid
+constexpr int PYRAMID_EDGE_SIZE = 19;
 
 // From OpenCV ORB
+// static, so that only visible within this file
 static int bit_pattern_31_[256*4] =
 {
     8,-3, 9,5/*mean (0), correlation (0)*/,
@@ -278,32 +277,90 @@ static int bit_pattern_31_[256*4] =
 };
 
 
-ORBDetectorDescriptor::ORBDetectorDescriptor( /* TODO: add parameter as needed */  )
+/**
+ * @brief The ORB constructor
+ * 
+ * @param _num_features : total number of features to extract
+ * @param pyramid_scale_factor : scale factor between pyramid layer
+ * @param _pyramid_num_level : number of pyramid layer
+ * @param _fast_default_threshold : default threshold used by fast
+ * @param _fast_min_threshold : adaptive min threshold used by fast
+ */
+ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
+                                              float pyramid_scale_factor, \
+                                              int _pyramid_num_level, \
+                                              int _fast_default_threshold, \
+                                              int _fast_min_threshold ):
+    num_features( _num_features ), \
+    pyramid_num_level( _pyramid_num_level ), \
+    fast_default_threshold( _fast_default_threshold ), \
+    fast_min_threshold( _fast_min_threshold )
 {
-    // TODO: add initialization related here
-    // For computePyramid
-    invScaleFactor.resize(nPyramidLayers);
+    /* image pyramid setting */
+    float pyramid_inv_scale_factor = 1.0f / pyramid_scale_factor;
+
+    // Scaling factor for each layer
+    pyramid_scale_factors.resize( pyramid_num_level );
+    pyramid_inv_scale_factors.resize( pyramid_num_level );
+
+    pyramid_scale_factors[ 0 ] = 1.0f;
+    pyramid_inv_scale_factors[ 0 ] = 1.0f;
+    for ( int level_i = 1; level_i < pyramid_num_level; ++level_i )
+    {
+        pyramid_scale_factors[ level_i ] = pyramid_scale_factors[ level_i - 1 ] * pyramid_scale_factor;
+        pyramid_inv_scale_factors[ level_i ] = 1.0f / pyramid_scale_factors[ level_i ];
+    }
+
+    pyramid_scaled_image.resize( pyramid_num_level );
+
+    // Number of features per level
+    // Here, the total number of features is distributed per each layer based on the scale factor
+    // NOTE: one can also choose other methods to distributed total features across layers
+    pyramid_num_features_per_level.resize( pyramid_num_level );
+
+    float num_features_per_level = num_features * \
+        ( 1 - pyramid_inv_scale_factor ) / \
+        ( 1 - (float)pow( (double)pyramid_inv_scale_factor, (double)pyramid_num_level ) );
+
+    int num_features_cnt = 0;
+    for ( int level_i = 0; level_i < pyramid_num_level - 1; level_i++ )
+    {
+        pyramid_num_features_per_level[ level_i ] = cvRound( num_features_per_level );
+        num_features_cnt += pyramid_num_features_per_level[ level_i ];
+        num_features_per_level *= pyramid_inv_scale_factor;
+    }
+    // Set remaining feature points to last level
+    pyramid_num_features_per_level[ pyramid_num_level - 1 ] = std::max( num_features - num_features_cnt, 0 );
+    
+    /* BRISK setting */
+
+    // Number of random pair to use in brisk
+    const cv::Point *brisk_random_pattern_src_ptr = (const cv::Point*)bit_pattern_31_;
+    std::vector<cv::Point> tmp_brisk_random_pattern( brisk_random_pattern_src_ptr, \
+                                                     brisk_random_pattern_src_ptr + 512 );
+    tmp_brisk_random_pattern.swap( brisk_random_pattern );
+
+    /* Rotation setting */
+    // TODO @Tiancheng add patch_umax setting below
 }
 
 
-ORBDetectorDescriptor::~ORBDetectorDescriptor() = default;
-
-
-void OrbFeatureDetector::detectAndCompute( cv::InputArray _image, \
-                                           cv::InputArray _mask, \
-                                           std::vector<cv::KeyPoint>& _keypoints, \
-                                           cv::OutputArray _descriptors, \
-                                           bool _useProvidedKeypoints )
+void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
+                                              cv::InputArray _mask, \
+                                              std::vector<cv::KeyPoint>& _keypoints, \
+                                              cv::OutputArray _descriptors, \
+                                              bool _useProvidedKeypoints )
 {
     // Currently don't support provided keypoint
     if ( _useProvidedKeypoints || _keypoints.size() )
     {
-        throw std::runtime_error("OrbFeatureDetector::detectAndCompute do not support provided keypoint\n" );
+        throw std::runtime_error("ORBDetectorDescriptor::detectAndCompute do not support provided keypoint\n" );
     }
 
+    // Currently doesn't support customize map
     if ( !_mask.empty() )
     {
-        throw std::runtime_error("OrbFeatureDetector::detectAndCompute do not support customize mask\n");
+        throw std::runtime_error("ORBDetectorDescriptor::detectAndCompute do not support customize mask\n");
     }
 
     // No input image, return
@@ -311,42 +368,111 @@ void OrbFeatureDetector::detectAndCompute( cv::InputArray _image, \
     {
         return;
     }
-    
-    // Convert image to gray scale
-    cv::Mat image = _image.getMat();
-    if ( image.type() != CV_8UC1 )
-    {
-        cv::cvtColor( _image, image, cv::COLOR_BGR2GRAY );
-    }
 
-    // TODO: most content of this function is not done. I'm only writing down main skeleton
+    // Require grayscale uint8
+    cv::Mat _gray_image_u8 = _image.getMat();
+    if ( _gray_image_u8.type() != CV_8UC1 )
+    {
+        throw std::runtime_error("ORBDetectorDescriptor::detectAndCompute input require uint 8, invalid input type\n");
+    }
 
     // Build image pyramic
-    // Note: no feature detection is done at this step
-    computePyramid( image );
+    // pyramid data is stored inside `pyramid_scaled_image`
+    computePyramid( _gray_image_u8 );
 
     // Per pyramid layer keypoints
-    std::vector<std::vector<cv::KeyPoint>> keypointsPyramid;
+    std::vector<std::vector<cv::KeyPoint>> pyramid_keypoints_per_level( pyramid_num_level );
 
-    // Compute KeyPoint per each pyramid level
-    computeKeyPointQuadTree( keypointsPyramid );
+    // Compute KeyPoint per each pyramid level using quad tree
+    // This is where the "uniform" feature distribution come from
+    // Apply FAST as underlying algorithm
+    computeFASTKeyPointQuadTree( pyramid_keypoints_per_level );
+
+    // Compute rotation
+    // TODO:: compute orientations for the key points of each level;
+    // this step must execute AFTER the QUAD tree distribution finished so it cannot be included within 
+    // previous step.
+    computeOrientation( pyramid_keypoints_per_level );
+
+    // Count total number of feature points
+    int total_num_features = 0;
+    for ( int level_i = 0; level_i < pyramid_num_level; ++level_i )
+    {
+        total_num_features += pyramid_keypoints_per_level.size();
+    }
+
+    // No keypoints is detected across all layer of pyramid
+    cv::Mat descriptors;
+    if ( total_num_features == 0 )
+    {
+        _descriptors.release();
+    }
+    // Allocate space for descriptors
+    else
+    {
+        _descriptors.create( total_num_features, 32, CV_8U );
+
+        // `descriptors` and `_descriptors` points to same underlying data in memory
+        // we modift `descriptors` in our code and its underlying data will change
+        descriptors = _descriptors.getMat();
+    }
+
+    std::vector<cv::KeyPoint> tmp_keypoints; 
+    tmp_keypoints.reserve( total_num_features );
 
     // For every pyramid layer, Gaussian blur & compute descriptor
-    for ( int layer_i = 0; layer_i < nPyramidLayer; ++layer_i )
+    int keypoints_cnt = 0;
+    for ( int level_i = 0; level_i < pyramid_num_level; ++level_i )
     {
-        // NOTE: unlinke ORBextractor.cc that clone an image mat and gaussian blur on top
-        // we gaussian blur on imagePyramid content directely to reduce memory footprint.
-        cv::GaussianBlur( imagePyramic[ layer_i ], imagePyramic[ layer_i ], cv::Size( 7, 7 ), 2, 2, cv::BORDER_REFLECT_101 );
+        std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level[ level_i ];
+        int num_keypoints_level_i = keypoints_level_i.size();
+        if ( num_keypoints_level_i == 0 )
+            continue;
 
-        cv::Mat descriptorsLayerI;
+        // NOTE: unlinke ORBextractor.cc that clone an image mat and gaussian blur on top
+        // we gaussian blur on pyramid_scaled_image content directely to reduce memory footprint.
+        cv::GaussianBlur( pyramid_scaled_image[ level_i ], \
+                          pyramid_scaled_image[ level_i ], \
+                          cv::Size( 7, 7 ), 2, 2, cv::BORDER_REFLECT_101 );
+
+        cv::Mat descriptors_level_i( num_keypoints_level_i, 32, CV_8U );
         
         // NOTE: this function is now a member function and can access briskPattern directely.
-        computeDescriptors( imagePyramic[ layer_i ], keypointsPyramid[ layer_i ], descriptorsLayerI );
+        computeBRISKDescriptorsPerPyramidLevel( \
+            pyramid_scaled_image[ level_i ], \
+            keypoints_level_i, \
+            descriptors_level_i );
+
+        const float scale_factor_level_i = pyramid_scale_factors[ level_i ];
+
+        // Add keypoints & descriptor to container
+        for ( int keypoint_level_i_index = 0; \
+                  keypoint_level_i_index < num_keypoints_level_i; \
+                  keypoint_level_i_index++ )
+        {
+            // Scale level_i keypoints to original
+            keypoints_level_i[ keypoint_level_i_index ].pt *= scale_factor_level_i;
+
+            // Add to keypoints container
+            tmp_keypoints.emplace_back( keypoints_level_i[ keypoint_level_i_index ] );
+
+            // Add to descriptor matrix
+            descriptors_level_i.row( keypoint_level_i_index ).copyTo( descriptors.row( keypoints_cnt ) );
+            keypoints_cnt++;
+        }
     }
+
+    // Swap keypoints container
+    tmp_keypoints.swap( _keypoints );
 }
 
 
-std::string ORBDetectorDescriptor::getDefaultName() const
+/**
+ * @brief Get name of this extractor, used in some opencv funciton
+ * 
+ * @return cv::String
+ */
+cv::String ORBDetectorDescriptor::getDefaultName() const
 {
     return (cv::FeatureDetector::getDefaultName() + ".ORBDetectorDescriptor");
 }
@@ -355,164 +481,190 @@ std::string ORBDetectorDescriptor::getDefaultName() const
 /**
  * @brief Build image pyramic
  * 
- * @param image Source image of original size
+ * @param image Source image of original size under uint8 gray scale
  */
 void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 {
-    for (int layer = 0; layer < nPyramidLayers; ++layer) {
-        float scale = invScaleFactor[layer];
+    for (int level_i = 0; level_i < pyramid_num_level; ++level_i) 
+    {
+        float level_i_inv_scale = pyramid_inv_scale_factors[ level_i ];
 
-        // Probably meant cv::Size...
-        cv::Size sz(cv::cvRound((float) image.cols * scale), cv::cvRound((float) image.rows * scale)); // sz is the variable name...
+        cv::Size level_i_scale_size( cvRound((float) image.cols * level_i_inv_scale ), \
+                                     cvRound((float) image.rows * level_i_inv_scale ));
 
-        cv::Size wholeSize(sz.width + EDGE_THRESHOLD*2, sz.height + EDGE_THRESHOLD*2);
+        cv::Size level_i_whole_size( level_i_scale_size.width + PYRAMID_EDGE_SIZE * 2, \
+                                     level_i_scale_size.height + PYRAMID_EDGE_SIZE * 2 );
+        
+        // Tmp image that contain border on both side
+        // We only need the center part of this tmp image
+        cv::Mat tmp_image( level_i_whole_size, image.type() );
 
-        cv::Mat temp(wholeSize, image.type());
-        cv::Mat maskTemp;
-        imagePyramid[layer] = temp(cv::Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+        // NOTE: cv::Mat operator ( cv::Rect ) is shallow copy
+        // when below line run, `pyramid_scaled_image[ level_i ]` and `tmp_image` all refer to the same underlying data
+        // `pyramid_scaled_image[ level_i ]` point to the region of interest specified by cv::Rect
+        // when the for loop finish, `tmp_image` out of scope, the reference count to that particular data - 1
+        // but the `pyramid_scaled_image[ level_i ]` still point to that data
+        pyramid_scaled_image[ level_i ] = tmp_image( cv::Rect( PYRAMID_EDGE_SIZE, \
+                                                               PYRAMID_EDGE_SIZE, \
+                                                               level_i_scale_size.width, \
+                                                               level_i_scale_size.height ) );
 
         // Compute the resized image
-        if (layer != 0) {
-            cv::resize(imagePyramid[layer-1], imagePyramid[layer], sz, 0, 0, cv::INTER_LINEAR);
+        // For non first layer image, resize + padding border
+        if ( level_i != 0) 
+        {
+            // Use previous layer + resize to generate current layer
+            cv::resize( pyramid_scaled_image[ level_i -1 ], \
+                        pyramid_scaled_image[ level_i ], \
+                        level_i_scale_size, 0, 0, cv::INTER_LINEAR );
 
-            // This is just an opencv function... that adds borders to the image
-            // The cv::BORDER_REFLECT_101 and stuff are border types enums
-            cv::copyMakeBorder(imagePyramid[layer], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, cv::BORDER_REFLECT_101+cv::BORDER_ISOLATED);
+            // Padding the resized to tmp
+            // https://docs.opencv.org/3.4/dc/da3/tutorial_copyMakeBorder.html
+            // Below line change data in tmp_image, and thus change the `pyramid_scaled_image[ level_i ]` that share the same data
+            cv::copyMakeBorder( pyramid_scaled_image[ level_i ], tmp_image, \
+                PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, \
+                cv::BorderTypes::BORDER_REFLECT_101 + cv::BorderTypes::BORDER_ISOLATED);
         }
-        else {
-            copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, BORDER_REFLECT_101);
+        // For first layer image, padding border
+        else 
+        {
+            cv::copyMakeBorder( image, tmp_image, \
+                PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, \
+                cv::BorderTypes::BORDER_REFLECT_101 );
         }
     }
-
 }
+
 
 /**
  * @brief Compute key point on every pyramid level using quad tree approach
  *
- * @param keypointsPyramid: a vector of vectors. The first dimension represents the layers of 
+ * @param pyramid_keypoints_per_level: a vector of vectors. The first dimension represents the layers of 
  *                          the computed image pyramid, while the inner vectors contains the 
  *                          actual key points located at that layer.
  */
-void ORBDetectorDescriptor::computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid )
+void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
+    std::vector<std::vector<cv::KeyPoint>> &pyramid_keypoints_per_level )
 {
-    keypointsPyramid.resize(nPyramidLayer);
-    const float W = 30;
+    // To ensure relative even/uniform keypoint detected across images
+    // image is divided into multiple grid
+    // an adaptive threshold is used to extract FAST keypoint from every grid
+
+    // cell size
+    const int cell_size = 30;
 
     // itr through the whole pyramid and process each layer.
-    for (int i = 0; i < nPyramidLayer; i++) 
+    for (int level_i = 0; level_i < pyramid_num_level; level_i++) 
     {
-        // get the valid image area of current layer
-        const int minX = EDGE_SIZE - 3;     // 3 is the radius set for the FAST calculation 
-        const int minY = EDGE_SIZE - 3;
-        const int maxX = imagePyramid[i].cols - minX;
-        const int maxY = imagePyramid[i].rows - minX;
+        // get the ROI image area of current layer
+        // FAST run in radious of 3, thus we can't run fast starting from the (0,0) boundary
+        const int roi_min_x = PYRAMID_EDGE_SIZE - 3; // 3 is the radius set for the FAST calculation 
+        const int roi_min_y = PYRAMID_EDGE_SIZE - 3;
+        const int roi_max_x = pyramid_scaled_image[ level_i ].cols - roi_min_x;
+        const int roi_max_y = pyramid_scaled_image[ level_i ].rows - roi_min_x;
 
-        const float width = maxX - minX;
-        const float height = maxY - minY;
+        const int roi_range_x = roi_max_x - roi_min_x;
+        const int roi_range_y = roi_max_y - roi_min_y;
 
         // get the amount of grids we have within current layer
-        const int gridCols = width / W;
-        const int gridRows = height / W;
+        // this is equivalent of taking floor
+        const int num_cell_x = roi_range_x / cell_size;
+        const int num_cell_y = roi_range_y / cell_size;
 
         // calculate the size of each grid
-        const int gridWidth = std::ceil(width / gridCols);
-        const int gridHeight = std::ceil(height / gridRows);
+        // cell_size_x/y might be diff from original cell_size due to boundary
+        const int cell_size_x = std::ceil( roi_range_x * 1.0f / num_cell_x );
+        const int cell_size_y = std::ceil( roi_range_y * 1.0f / num_cell_y );
 
-        // reserve extra space for keypoints
-        std::vector<cv::KeyPoint> keypointsToDistribute;
-        keypointsToDistribute.reserve(featureAmountTarget * 10);
+        // Container that tmp store keypoints
+        // Those keypoints will be "distributed" uniformly across images using octree
+        std::vector<cv::KeyPoint> keypoints_to_distribute_level_i;
+        keypoints_to_distribute_level_i.reserve( num_features * 10 );
 
-        // traverse all the grids
-        for (int r = 0; r < gridRows; r++)
+        // traverse all the cell to compute fast on each cell
+        for ( int cell_y_i = 0; cell_y_i < num_cell_y; cell_y_i++ )
         {
-            const float initialRCoord = r * gridHeight + minY;
-            float terminateRCoord = initialRCoord + gridHeight + 6;
+            // current cell start index ( y )
+            const int cell_y_i_start = cell_y_i * cell_size_y + roi_min_y;
 
-            if (initialRCoord > maxY - 3)
+            // current cell end index ( y )
+            // +6 account for FAST 3 pixel border
+            // consider potential out of bound issue
+            const int cell_y_i_end = ( cell_y_i_start + cell_size_y + 6 > roi_max_x ? roi_max_x : cell_y_i_start + cell_size_y + 6 );
+
+            // out of bound
+            if ( cell_y_i_start > roi_max_y - 3 )
                 continue;
-            if (terminateRCoord > maxY)
-                terminateRCoord = maxY;
 
-            for (int c = 0; c < gridCols; c++)
+            for ( int cell_x_j = 0; cell_x_j < num_cell_x; cell_x_j++ )
             {
-                const float initialCCoord = c * gridWidth + minX;
-                float terminateCCoord = initialCCoord + gridWidth + 6;
+                const int cell_x_j_start = cell_x_j * cell_size_x + roi_min_x;
+                const int cell_x_j_end = ( cell_x_j_start + cell_size_x + 6 > roi_max_x ? roi_max_x : cell_x_j_start + cell_size_x + 6 );
 
-                if (initialCCoord > maxX - 3)
+                // out of bound
+                if  (cell_x_j_start > roi_max_x - 3 )
                     continue;
-                if (terminateCCoord > maxX)
-                    terminateCCoord = maxX;
 
-                // a vector, holds all of the keypoints within this grid.
-                std::vector<cv::KeyPoint> gridKeypoints;
+                // Current grid is defined as
+                // [ cell_y_i_start, cell_y_i_end ) x [ cell_x_j_start, cell_x_j_end )
+
+                // all of the keypoints within this grid.
+                std::vector<cv::KeyPoint> curr_cell_keypoints;
 
                 // OpenCV's FAST detector, first try, with higher threshold.
-                FAST(imagePyramid[i].rowRange(initialRCoord, terminateRCoord).colRange(initialCCoord, terminateCCoord),
-                    gridKeypoints,
-                    defaultFASTThreshold,
-                    true
-                );
+                // use rowRange colRange to specify only run on the current grid part
+                cv::FAST( pyramid_scaled_image[ level_i ].rowRange( cell_y_i_start, cell_y_i_end ).colRange( cell_x_j_start, cell_x_j_end ), \
+                    curr_cell_keypoints, fast_default_threshold, true );
 
-                if (gridKeypoints.empty())
-				{
-					FAST(imagePyramid[i].rowRange(initialRCoord, terminateRCoord).colRange(initialCCoord, terminateCCoord),
-						gridKeypoints,
-						minFASTThreshold,
-						true
-					);
-				}
+                // adaptive methods, if default threshold do not detect any feature, try lower threshold
+                // If still unable to detect any keypoint, give up
+                if ( curr_cell_keypoints.empty() )
+					cv::FAST( pyramid_scaled_image[ level_i ].rowRange( cell_y_i_start, cell_y_i_end).colRange( cell_x_j_start, cell_x_j_end ), \
+						curr_cell_keypoints, fast_min_threshold, true );
 
-                if (!gridKeypoints.empty())
+                if ( !curr_cell_keypoints.empty() )
                 {
-                    for (auto vit = gridKeypoints.begin(); vit != gridKeypoints.end(); vit++)
+                    for ( auto& cell_keypoints_i : curr_cell_keypoints )
                     {
-                        vit->pt.x += c * gridWidth;
-                        vit->pt.y += r * gridHeight;
+                        // Convert FAST location back to original image coordinate
+                        cell_keypoints_i.pt.x += cell_x_j * cell_size_x;
+                        cell_keypoints_i.pt.y += cell_y_i * cell_size_y;
 
-                        keypointsToDistribute.push_back(*vit);
+                        // Save to tmp container
+                        keypoints_to_distribute_level_i.emplace_back( cell_keypoints_i );
                     }
                 }
-            }
-        }
+            } // end iterate cell x
+        } // end iterate cell y
 
         // store a reference to all the keypoints that belongs to the current layer
-        std::vector<cv::KeyPoint>& currentKeypoints = keypointsPyramid[i];
-        currentKeypoints.reserve(featureAmountTarget);
+        std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level[ level_i ];
+        keypoints_level_i.reserve( pyramid_num_features_per_level[ level_i ] );
 
         // TODO:: a function here to re-distribute the points into oct tree
-        currentKeypoints = QuadTreeDistribute(keypointsToDistribute,
-                                              minX, maxX,
-                                              minY, maxY,
-                                              targetFeaturePerLevel[i],
-                                              i);
+        // NOTE: number of keypoints in `keypoints_to_distribute_level_i` may exceed the expected keypoints at current layer
+        //      during the quad tree distribution process, we will eliminate those keypoints.
+        QuadTreeDistributePerPyramidLevel( \
+            keypoints_to_distribute_level_i, \
+            keypoints_level_i, \
+            roi_min_x, roi_max_x, \
+            roi_min_y, roi_max_y, \
+            pyramid_num_features_per_level[ level_i ], \
+            level_i );
+        
+        const int patch_size_level_i = EXTRACTOR_PATCH_SIZE * pyramid_scale_factors[ level_i ];
 
         // traverse all feature points and restore their coordinates under current layer
-        for (int k = 0; k < currentKeypoints.size(); k++)
+        for ( auto& keypoints_level_i_j : keypoints_level_i )
         {
-            currentKeypoints[k].pt.x += minX;
-            currentKeypoints[k].pt.y += minY;
-
-            currentKeypoints[k].octave = i;
-            currentKeypoints[k].size = PATCH_SIZE * layerScaleFactors[i];
+            keypoints_level_i_j.pt.x += roi_min_x;
+            keypoints_level_i_j.pt.y += roi_min_y;
+            keypoints_level_i_j.octave = level_i;
+            keypoints_level_i_j.size = patch_size_level_i;
         }
-    }
-
-    // TODO:: compute orientations for the key points of each level;
-    // this step must execute AFTER the QUAD tree distribution finished so it cannot be included within 
-    // previous step.
-    for (int i = 0; i < nPyramidLayer; i++)
-    {
-        findOrientation(imagePyramid[i], keypointsPyramid[i], pyramidUBoundaries);
-    }
-
+    } // end of level i
 }
 
-
-int getValue(int i, float cosine, float sine){
-    int xPrime = cvRound(pattern[i].x * cosine - pattern[i].y * sine)
-    int yPrime = cvRound(pattern[i].x * sine + pattern[i].y * cosine);
-    return center[yPrime * step + xPrime];    
-}
 
 /**
  * @brief Compute descriptor for each pyramic layer
@@ -521,104 +673,154 @@ int getValue(int i, float cosine, float sine){
  * @param keypoints Keypoints detected at that layer
  * @param descriptors output descriptors
  */
-void ORBDetectorDescriptor::computeDescriptors( const cv::Mat& image, \
-                                                std::vector<cv::KeyPoint>& keypoints, \
-                                                cv::Mat& descriptors, \
-                                                const vector<Point>& pattern )
+void ORBDetectorDescriptor::computeBRISKDescriptorsPerPyramidLevel( \
+    const cv::Mat& image, \
+    std::vector<cv::KeyPoint>& keypoints, \
+    cv::Mat& descriptors )
 {
-    // NOTE: when implementing, you should merge `ORBextractor.cc computeDescriptors` \
-    //  and `ORBextractor.cc computeOrbDescriptor` to this one single function
-    descriptors = Mat::zeros(keypoints.size(), 32, CV_8UC1);
+    // Zero out container
+    descriptors = cv::Mat::zeros( keypoints.size(), 32, CV_8UC1 );
 
     const float factorPi = (float)(CV_PI/180.0);
-    for (int i=0; i<keypoints.size(); ++i){
+    
+    // step that opencv used to save image
+    const int img_step = int(image.step);
+
+    // Compute BRISK descriptor for every keypoint
+    for ( int keypoint_idx = 0; keypoint_idx < keypoints.size(); ++keypoint_idx )
+    {
+        // Ptr to brisk random pair pattern
+        const cv::Point* brisk_random_pattern_ptr = brisk_random_pattern.data();
+
+        // Get reference to keypoint
+        const cv::KeyPoint& keypoint_i = keypoints[ keypoint_idx ];
 
         // get the angle of the keypoint (and get the cos and sin value)
-        float angle = (float)keypoints[i].angle * factorPi;
-        float cosine = (float)cos(angle), sine = (float)sin(angle);
+        float keypoint_i_angle = keypoint_i.angle * factorPi;
+        float keypoint_i_cos = cos( keypoint_i_angle );
+        float keypoint_i_sin = sin( keypoint_i_angle );
 
-        // get the center of the image
-        const uchar* center = &image.at<uchar>(cvRound(kpt.pt.y), cvRound(kpt.pt.x));
-        const int step = (int)image.step;
+        // get the center of the keypoint in image
+        const uchar* keypoint_i_img_center = &image.at<uchar>( \
+            cvRound( keypoint_i.pt.y ), \
+            cvRound( keypoint_i.pt.x ) );
 
-        // brief descriptors are 32 x 8bit
-        // need 16 random points for 8 bit comparison
-        for (int j=0; j<32; ++j, pattern+=16)
+        #define ORB_BRISK_GET_PATTERN( idx ) \
+            keypoint_i_img_center[ \
+                cvRound( brisk_random_pattern_ptr[ idx ].x * keypoint_i_sin + \
+                         brisk_random_pattern_ptr[ idx ].y * keypoint_i_cos ) * img_step + \
+                cvRound( brisk_random_pattern_ptr[ idx ].x * keypoint_i_cos - \
+                         brisk_random_pattern_ptr[ idx ].y * keypoint_i_sin ) ]
+
+        // Random sample 8 pixel pair around the the keypoint's image location center
+        // NOTE: below for loop run for each keypoint
+        for ( int i = 0; i < 32; ++i, brisk_random_pattern_ptr += 16 )
         {
-            
+            // t0, t1 : two random pixel define by brisk_random_pattern
+            // val : use every bit to represent the descriptor result
+            //      after the 8 pair finish, val contain 8 binary represent result
             int t0, t1, val;
-            
-            t0 = getValue(0, cosine, sine); 
-            t1 = getValue(1, cosine, sine);
-            val = t0 < t1;							
-            t0 = getValue(2, cosine, sine); 
-            t1 = getValue(3, cosine, sine);
-            val |= (t0 < t1) << 1;					
-            t0 = getValue(4, cosine, sine); 
-            t1 = getValue(5, cosine, sine);
-            val |= (t0 < t1) << 2;					
-            t0 = getValue(6, cosine, sine); 
-            t1 = getValue(7, cosine, sine);
-            val |= (t0 < t1) << 3;					
-            t0 = getValue(8, cosine, sine); 
-            t1 = getValue(9, cosine, sine);
-            val |= (t0 < t1) << 4;					
-            t0 = getValue(10, cosine, sine); 
-            t1 = getValue(11, cosine, sine);
-            val |= (t0 < t1) << 5;					
-            t0 = getValue(12, cosine, sine); 
-            t1 = getValue(13, cosine, sine);
-            val |= (t0 < t1) << 6;					
-            t0 = getValue(14, cosine, sine); 
-            t1 = getValue(15, cosine, sine);
+
+            t0 = ORB_BRISK_GET_PATTERN( 0 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 1 );
+            val = t0 < t1;
+
+            t0 = ORB_BRISK_GET_PATTERN( 2 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 3 );
+            val |= (t0 < t1) << 1;
+
+            t0 = ORB_BRISK_GET_PATTERN( 4 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 5 );
+            val |= (t0 < t1) << 2;
+
+            t0 = ORB_BRISK_GET_PATTERN( 6 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 7 );
+            val |= (t0 < t1) << 3;
+
+            t0 = ORB_BRISK_GET_PATTERN( 8 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 9 );
+            val |= (t0 < t1) << 4;
+
+            t0 = ORB_BRISK_GET_PATTERN( 10 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 11 );
+            val |= (t0 < t1) << 5;
+
+            t0 = ORB_BRISK_GET_PATTERN( 12 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 13 );
+            val |= (t0 < t1) << 6;
+
+            t0 = ORB_BRISK_GET_PATTERN( 14 ); 
+            t1 = ORB_BRISK_GET_PATTERN( 15 );
             val |= (t0 < t1) << 7;				
 
-            descriptors[i][j] = (uchar)val;
+            descriptors.ptr(keypoint_idx)[ i ] = (uchar)val;
         }
     }
 }
 
-// TODO:: finish this, find orientation helper
-void ORBDetectorDescriptor::findOrientation(std::vector<cv::Mat> imagePyramid, std::vector<std::vector<cv::KeyPoint>>& keypointsPyramid, std::vector<int> pyramidUBoundaries)
-{
 
+// TODOfinish this, find orientation helper
+
+/**
+ * @brief Find IC_Angle for every keypoints in a given pyramid layer
+ * 
+ * @param pyramid_keypoints_per_level keypoints per each pyramid level
+ */
+void ORBDetectorDescriptor::computeOrientation( \
+    std::vector<std::vector<cv::KeyPoint>>& pyramid_keypoints_per_level )
+{
+    return;
 }
 
 
 // TODO:: finish this
-std::vector<cv::KeyPoint> ORBDetectorDescriptor::QuadTreeDistribute(const std::vector<cv::KeyPoint>& keypointsToDistribute, const int& minX, const int& maxX, const int& minY, const int& maxY, const int& nFeatures, const int& level)
+
+/**
+ * @brief Use quad tree to distribute all keypoints uniformly across current layer
+ * 
+ * @param keypoints_to_distribute_level_i: keypoint wait to distribute
+ * @param keypoints_level_i destination container
+ * @param roi_minmax_xy : ROI of image
+ * @param num_feature_level_i : desired number of feature at this layer
+ * @param level_i : pyramid level
+ */
+void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
+    const std::vector<cv::KeyPoint>& keypoints_to_distribute_level_i, \
+          std::vector<cv::KeyPoint>& keypoints_level_i, \
+    int roi_min_x, int roi_max_x, \
+    int roi_min_y, int roi_max_y, \
+    int num_feature_level_i, \
+    int level_i )
 {
-    const int nIni = std::round(static_cast<float>(maxX - minX) / (maxY - minY));
-    const float hX = static_cast<float>(maxX - minX) / nIni;
+    const int num_init_node = std::round( float(roi_max_x - roi_min_x) / float(roi_max_y - roi_min_y));
+    const float num_node_pixel_x = float(roi_max_x - roi_min_x) / num_init_node;
 
     std::list<QuadTreeNode> nodesList;
     std::vector<QuadTreeNode*> initialNodesPtrs;
-
-    initialNodesPtrs.resize(nIni);
+    initialNodesPtrs.resize( num_init_node );
 
     // initialize all quad tree nodes and push them into container
-    for (int i = 0; i < nIni; i++)
+    for (int i = 0; i < num_init_node; i++)
     {
         QuadTreeNode qNode;
 
-        qNode.UL = cv::Point2i(hX * static_cast<float>(i), 0);
-        qNode.UR = cv::Point2i(hX * static_cast<float>(i + 1), 0);
-        qNode.BL = cv::Point2i(qNode.UL.x, maxY - minY);
-        qNode.BR = cv::Point2i(qNode.UR.x, maxY - minY);
+        qNode.UL = cv::Point2i(num_node_pixel_x * static_cast<float>(i), 0);
+        qNode.UR = cv::Point2i(num_node_pixel_x * static_cast<float>(i + 1), 0);
+        qNode.BL = cv::Point2i(qNode.UL.x, roi_max_y - roi_min_y);
+        qNode.BR = cv::Point2i(qNode.UR.x, roi_max_y - roi_min_y);
 
-        qNode.keypoints.reserve(keypointsToDistribute.size());
+        qNode.keypoints.reserve( keypoints_to_distribute_level_i.size() );
 
         nodesList.push_back(qNode);
         initialNodesPtrs[i] = &nodesList.back();
     }
 
 	// link points to child nodes
-    for (int i = 0; i < keypointsToDistribute.size(); i++)
+    for ( const auto& keypoints_to_distribute_j : keypoints_to_distribute_level_i )
     {
-        const cv::KeyPoint& kp = keypointsToDistribute[i];
-        initialNodesPtrs[kp.pt.x / hX]->keypoints.push_back(kp);
+        initialNodesPtrs[ keypoints_to_distribute_j.pt.x / num_node_pixel_x ]->keypoints.emplace_back( keypoints_to_distribute_j );
     }
-    
+
     // traverse the quad tree nodes list, mark the nodes that no longer needs to be split, delete the nodes that did not 
     // have a keypoint associated with it.
     auto lit = nodesList.begin();
@@ -637,16 +839,13 @@ std::vector<cv::KeyPoint> ORBDetectorDescriptor::QuadTreeDistribute(const std::v
 
     }
 
-    std::vector<cv::KeyPoint> resultKeyPoints;
-    resultKeyPoints.reserve(nFeatures);
-
     for (auto lit = nodesList.begin(); lit != nodesList.end(); lit++)
     {
 
+        // NOTE: add to `keypoints_level_i` directely
     }
-
-    return resultKeyPoints;
 }
+
 
 // TODO:: finish this
 void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4)

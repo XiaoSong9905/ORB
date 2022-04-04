@@ -39,21 +39,37 @@ public:
     void divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4);
 };
 
+
+/**
+ * @brief ORB feature detector & descriptor
+ * 
+ * @note This class contain internal state information. Should avoid using multithread to call detectAndCompute()
+ * 
+ */
 class ORBDetectorDescriptor : public cv::Feature2D
 {
     public:
+
         /**
          * @brief The ORB constructor
          * 
-         * @param param-name param-content
+         * @param _num_features : total number of features to extract
+         * @param pyramid_scale_factor : scale factor between pyramid layer
+         * @param _pyramid_num_level : number of pyramid layer
+         * @param _fast_default_threshold : default threshold used by fast
+         * @param _fast_min_threshold : adaptive min threshold used by fast
          */
-        ORBDetectorDescriptor( /* TODO: add parameter as needed */ );
+        ORBDetectorDescriptor( int _num_features, \
+                               float pyramid_scale_factor, \
+                               int _pyramid_num_level, \
+                               int _fast_default_threshold, \
+                               int _fast_min_threshold );
 
         /**
          * @brief Destroy the ORBDetectorDescriptor object
          * 
          */
-        virtual ~ORBDetectorDescriptor();
+        virtual ~ORBDetectorDescriptor() = default;
 
         /**
          * @brief Detect keypoint and compute the descriptor
@@ -79,48 +95,52 @@ class ORBDetectorDescriptor : public cv::Feature2D
                                        bool useProvidedKeypoints=false ) override;
 
         /**
-         * @brief Getname of this extractor, used in some opencv funciton
+         * @brief Get name of this extractor, used in some opencv funciton
          * 
-         * @return std::string 
+         * @return cv::String 
          */
-        virtual std::string getDefaultName() const override;
-
+        virtual cv::String getDefaultName() const override;
     
     protected:
-        // TODO add helper function & helper member varaible here
+        /* Feature extraction related settings */
         
+        // total number of features extracted
+        int num_features;
+
+        /* Image pyramid related settings */
+
         // Number of pyramid layers
-        int nPyramidLayers;
+        int pyramid_num_level;
 
-        // default OpenCV FAST detection threshold
-        int defaultFASTThreshold;
+        // scale factor between each image pyramid layer 
+        // double pyramid_scale_factor;
 
-        // min OpenCV FAST detection threshold
-        int minFASTThreshold;
-
-        // target amount of features we want to extract from one image 
-        int featureAmountTarget;
-
-        // the scaleFactor applied on different layers within the image pyramid.
-        double scaleFactor;
+        // number of features for each pyramid layer
+        std::vector<int> pyramid_num_features_per_level;
 
         // Image at each pyramid level
-        std::vector<cv::Mat> imagePyramid;
+        std::vector<cv::Mat> pyramid_scaled_image;
 
-        // Other variables used for computePyramid
-        std::vector<float> invScaleFactor;
+        // Scaling factor (and inverse) for each pyramic layer
+        std::vector<float> pyramid_scale_factors;
+        std::vector<float> pyramid_inv_scale_factors;
 
+        /* BRISK related setting */
+        std::vector<cv::Point> brisk_random_pattern;
+    
+        /* FAST related setting */
+        // default OpenCV FAST detection threshold
+        int fast_default_threshold;
 
-        // BRISK random pattern
-        std::vector<cv::point> briskPattern;
+        // min OpenCV FAST detection threshold
+        // this is used in adaptive fast
+        int fast_min_threshold;
 
-        // a look-up table for the scale factors of each layer within the pyramid.
-        std::vector<float> layerScaleFactors;
-
-        std::vector<int> targetFeaturePerLevel;
-
+        /* Rotation related setting */
         // a look-up table for U axis boundary size on each level 
-        std::vector<int> pyramidUBoundaries;
+        std::vector<int> patch_umax;
+
+    protected:
 
         /**
          * @brief Build image pyramic
@@ -132,9 +152,18 @@ class ORBDetectorDescriptor : public cv::Feature2D
         /**
          * @brief Compute key point on every pyramid level using quad tree approach
          * 
-         * @param keypointsPyramid keypoints per each pyramid level
+         * @param pyramid_keypoints_per_level keypoints per each pyramid level
          */
-        void computeKeyPointQuadTree( std::vector<std::vector<cv::KeyPoint>& keypointsPyramid ); 
+        void computeFASTKeyPointQuadTree( \
+            std::vector<std::vector<cv::KeyPoint>> &pyramid_keypoints_per_level ); 
+
+        /**
+         * @brief Find IC_Angle for every keypoints in a given pyramid layer
+         * 
+         * @param pyramid_keypoints_per_level keypoints per each pyramid level
+         */
+        void computeOrientation( \
+            std::vector<std::vector<cv::KeyPoint>>& pyramid_keypoints_per_level );
 
         /**
          * @brief Compute descriptor for each pyramic layer
@@ -143,13 +172,27 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * @param keypoints Keypoints detected at that layer
          * @param descriptors output descriptors
          */
-        void computeDescriptors( const cv::Mat& image, \
-                                 std::vector<cv::KeyPoint>& keypoints, \
-                                 cv::Mat& descriptors );
+        void computeBRISKDescriptorsPerPyramidLevel( \
+            const cv::Mat& image, \
+            std::vector<cv::KeyPoint>& keypoints, \
+            cv::Mat& descriptors );
 
-        void findOrientation(std::vector<cv::Mat> imagePyramid, std::vector<std::vector<cv::KeyPoint>>& keypointsPyramid, std::vector<int> pyramidUBoundaries);
-
-        std::vector<cv::KeyPoint> QuadTreeDistribute(const std::vector<cv::KeyPoint>& keypointsToDistribute, const int &minX, const int &maxX, const int &minY, const int &maxY, const int &nFeatures, const int &level);
+        /**
+         * @brief Use quad tree to distribute all keypoints uniformly across current layer
+         * 
+         * @param keypoints_to_distribute_level_i: keypoint wait to distribute
+         * @param keypoints_level_i destination container
+         * @param roi_minmax_xy : ROI of image
+         * @param num_feature_level_i : desired number of feature at this layer
+         * @param level_i : pyramid level
+         */
+        void QuadTreeDistributePerPyramidLevel( \
+            const std::vector<cv::KeyPoint>& keypoints_to_distribute_level_i, \
+                  std::vector<cv::KeyPoint>& keypoints_level_i, \
+            int roi_min_x, int roi_max_x, \
+            int roi_min_y, int roi_max_y, \
+            int num_feature_level_i, \
+            int level_i );
 };
 
 };
