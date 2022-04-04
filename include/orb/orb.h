@@ -195,4 +195,4 @@ class ORBDetectorDescriptor : public cv::Feature2D
             int level_i );
 };
 
-};
+}

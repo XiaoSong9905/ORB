@@ -26,7 +26,7 @@ int main ( int argc, char** argv )
     cv::Mat descriptors1, descriptors2;
 
     printf("Build our own ORB feature detector\n"); fflush( stdout );
-    orb::ORBDetectorDescriptor orb_feature;
+    orb::ORBDetectorDescriptor orb_feature{ 100, 0.5, 10, 5, 2 }; // NOTE: those value are just random value used to compile the program
     orb_feature.detectAndCompute( image1, cv::noArray(), keypoints1, descriptors1 );
     orb_feature.detectAndCompute( image2, cv::noArray(), keypoints2, descriptors2 );
 

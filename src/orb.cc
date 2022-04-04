@@ -687,7 +687,7 @@ void ORBDetectorDescriptor::computeBRISKDescriptorsPerPyramidLevel( \
     const int img_step = int(image.step);
 
     // Compute BRISK descriptor for every keypoint
-    for ( int keypoint_idx = 0; keypoint_idx < keypoints.size(); ++keypoint_idx )
+    for ( size_t keypoint_idx = 0; keypoint_idx < keypoints.size(); ++keypoint_idx )
     {
         // Ptr to brisk random pair pattern
         const cv::Point* brisk_random_pattern_ptr = brisk_random_pattern.data();
