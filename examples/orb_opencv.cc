@@ -12,9 +12,9 @@
 
 int main ( int argc, char** argv )
 {
-    if ( argc != 3 )
+    if ( argc != 4 )
     {
-        printf("Usage: ./demo PATH_TO_IMAGE1, PATH_TO_IMAGE2\n");
+        printf("Usage: ./demo PATH_TO_IMAGE1, PATH_TO_IMAGE2, DESCRIPTOR_TYPE\n");
         exit(1);
     }
 
@@ -24,10 +24,21 @@ int main ( int argc, char** argv )
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
     cv::Mat descriptors1, descriptors2;
 
-    printf("Build opencv ORB feature detector\n"); fflush( stdout );
-    cv::Ptr<cv::ORB> orb = cv::ORB::create();
-    orb->detectAndCompute(image1, cv::Mat(), keypoints1, descriptors1);
-    orb->detectAndCompute(image2 cv::Mat(), keypoints2, descriptors2);
+    string type = argv[3];
+    
+    if (type == 'orb_opencv') {
+        printf("Build opencv ORB feature detector\n"); fflush( stdout );
+        cv::Ptr<cv::ORB> orb = cv::ORB::create();
+        orb->detectAndCompute(image1, cv::Mat(), keypoints1, descriptors1);
+        orb->detectAndCompute(image2 cv::Mat(), keypoints2, descriptors2);
+    } 
+    else if (type == 'orb_brisk') {
+        printf("Build opencv BRISK feature detector\n"); fflush( stdout );
+        cv::Ptr<cv::BRISK> brisk = cv::BRISK::create();
+        brisk->detectAndCompute(image1, cv::Mat(), keypoints1, descriptors1);
+        brisk->detectAndCompute(image2 cv::Mat(), keypoints2, descriptors2);
+    }
+    
 
     printf("Build opencv matcher\n"); fflush( stdout );
     cv::BFMatcher matcher;
