@@ -1,7 +1,7 @@
 //
 // Demo on using opencv feature detector
 // Reference 
-// 1. https://docs.opencv.org/3.4/d1/d89/tutorial_py_orb.html
+// 1. https://github.com/oreillymedia/Learning-OpenCV-3_examples/blob/master/example_16-02.cpp
 // 2. https://docs.opencv.org/3.4/dc/d16/tutorial_akaze_tracking.html
 // 
 #include <cstdio>
