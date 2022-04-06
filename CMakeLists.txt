@@ -9,6 +9,12 @@ set(ORB_MINOR_VERSION 0)
 set(ORB_PATCH_VERSION 0)
 set(ORB_VERSION ${ORB_MAJOR_VERSION}.${ORB_MINOR_VERSION}.${ORB_PATCH_VERSION})
 
+# Set C++ standard
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++14 -fPIC")
+
 # Offer the user the choice of overriding the installation directories
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
 set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
@@ -48,6 +54,15 @@ endif()
 find_package( OpenCV REQUIRED )
 include_directories(BEFORE ${OpenCV_INCLUDE_DIRS} )
 
+# Arm / X86 optimize flag
+if(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "arm*")
+  message(STATUS "ARM processor detected, will attempt to use NEON.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
+else()
+  message(STATUS "Assuming SSE instructions available.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mssse3")
+endif()
+
 if(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "arm*")
   message(STATUS "ARM processor detected, will attempt to use NEON.")
   add_definitions(-mfpu=neon -DHAVE_OPENCV -Wall -pedantic -std=c++0x -fPIC)
@@ -74,15 +89,19 @@ include_directories(include)
 add_library(${PROJECT_NAME} STATIC src/orb.cc)
 
 
-# and link it                   
-target_link_libraries(${PROJECT_NAME} PUBLIC ${OpenCV_LIBS})
+# and link it
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  ${OpenCV_LIBS})
 
 
 # installation if required
 install(TARGETS ${PROJECT_NAME} 
   EXPORT orbTargets
   ARCHIVE DESTINATION ${INSTALL_LIB_DIR})
-install(DIRECTORY include/ DESTINATION ${INSTALL_INCLUDE_DIR} COMPONENT dev FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY include/ DESTINATION 
+  ${INSTALL_INCLUDE_DIR} COMPONENT 
+  dev FILES_MATCHING PATTERN "*.h")
 
 # installation is invoked in the individual modules...
 export (TARGETS 
