@@ -880,15 +880,90 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
     for (auto lit = nodesList.begin(); lit != nodesList.end(); lit++)
     {
 
-        // NOTE: add to `keypoints_level_i` directely
+        // NOTE: add to `keypoints_level_i` directly
     }
 }
 
-
-// TODO:: finish this
+/**
+ * @brief Divide the current node into four sub areas.
+ *
+ * @param[in & out] n1   divided node 1
+ * @param[in & out] n2   divided node 2
+ * @param[in & out] n3   divided node 3
+ * @param[in & out] n4   divided node 4
+ */
 void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4)
 {
+    // get the half width and half height value of the image area represented by current node
+    const int half_width_x = std::ceil(static_cast<float>(this->UR.x - this->UL.y) / 2);
+    const int half_height_y = std::ceil(static_cast<float>(this->BR.y - this->UL.y) / 2);
 
+    // update the boundaries value for the child nodes
+    // node one, stores the upper left area
+	n1.UL = this->UL;
+	n1.UR = cv::Point2i(UL.x + half_width_x, UL.y);
+	n1.BL = cv::Point2i(UL.x, UL.y + half_height_y);
+	n1.BR = cv::Point2i(UL.x + half_width_x, UL.y + half_height_y);
+
+    // node two, stores the upper right area
+	n2.UL = n1.UR;
+	n2.UR = this->UR;
+	n2.BL = n1.BR;
+	n2.BR = cv::Point2i(UR.x, UL.y + half_height_y);
+	
+    // node three, stores the bottom left area
+	n3.UL = n1.BL;
+	n3.UR = n1.BR;
+	n3.BL = this->BL;
+	n3.BR = cv::Point2i(n1.BR.x, BL.y);
+
+    // node four, stores the bottom right area
+	n4.UL = n3.UR;
+	n4.UR = n2.BR;
+	n4.BL = n3.BR;
+	n4.BR = this->BR;
+
+    // reserve the space for storing key points
+    n1.keypoints.reserve(this->keypoints.size());
+    n2.keypoints.reserve(this->keypoints.size());
+    n3.keypoints.reserve(this->keypoints.size());
+    n4.keypoints.reserve(this->keypoints.size());
+
+    // redistribute the key points to corresponding new nodes
+    for (size_t i = 0; i < this->keypoints.size(); i++)
+    {
+        // get a reference of the key point we are processing
+        const cv::KeyPoint& keypoint_reference = this->keypoints[i];
+
+        // test which sub area does the current key point belongs to
+        // assign it to the correct new nodes
+        if (keypoint_reference.pt.x < n1.UR.x)
+        {
+			if (keypoint_reference.pt.y < n1.BR.y)
+				n1.keypoints.push_back(keypoint_reference);
+			else
+				n3.keypoints.push_back(keypoint_reference);
+        }
+        else if (keypoint_reference.pt.y < n1.BR.y)
+        {
+            n2.keypoints.push_back(keypoint_reference);
+        }
+        else
+        {
+            n4.keypoints.push_back(keypoint_reference);
+        }
+    }
+
+    // check the final number of key points been assigned to each nodes
+    // if the amount == 1, we mark the node as final and stop further divide it
+    if (n1.keypoints.size() == 1)
+        n1.is_final = true;
+	if (n2.keypoints.size() == 1)
+		n2.is_final = true;
+	if (n3.keypoints.size() == 1)
+		n3.is_final = true;
+	if (n4.keypoints.size() == 1)
+		n4.is_final = true;
 }
 
 } // namespace orb

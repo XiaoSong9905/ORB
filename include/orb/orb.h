@@ -21,12 +21,12 @@ public:
     std::list<QuadTreeNode>::iterator lit;
 
     // a flag used to determine if a node already entered its final status.
-    bool isFinal;
+    bool is_final;
 
     /**
      * @brief The QuadNode constructor
      */
-    QuadTreeNode() : isFinal(false){}
+    QuadTreeNode() : is_final(false){}
 
     /**
      * @brief Divide the current node into four sub areas.
