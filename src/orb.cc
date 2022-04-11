@@ -638,7 +638,6 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
         std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level[ level_i ];
         keypoints_level_i.reserve( pyramid_num_features_per_level[ level_i ] );
 
-        // TODO:: a function here to re-distribute the points into oct tree
         // NOTE: number of keypoints in `keypoints_to_distribute_level_i` may exceed the expected keypoints at current layer
         //      during the quad tree distribution process, we will eliminate those keypoints.
         QuadTreeDistributePerPyramidLevel( \
@@ -810,9 +809,6 @@ void ORBDetectorDescriptor::computeOrientation( \
     } // end for every layer
 }
 
-
-// TODO:: finish this
-
 /**
  * @brief Use quad tree to distribute all keypoints uniformly across current layer
  * 
@@ -833,54 +829,218 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
     const int num_init_node = std::round( float(roi_max_x - roi_min_x) / float(roi_max_y - roi_min_y));
     const float num_node_pixel_x = float(roi_max_x - roi_min_x) / num_init_node;
 
-    std::list<QuadTreeNode> nodesList;
-    std::vector<QuadTreeNode*> initialNodesPtrs;
-    initialNodesPtrs.resize( num_init_node );
+    // a list use to hold all quad tree nodes of this level
+    std::list<QuadTreeNode> quad_tree_node_list;
+
+    std::vector<QuadTreeNode*> quad_tree_roots_ptrs;
+    quad_tree_roots_ptrs.resize( num_init_node );
 
     // initialize all quad tree nodes and push them into container
     for (int i = 0; i < num_init_node; i++)
     {
-        QuadTreeNode qNode;
+        QuadTreeNode quad_tree_node;
 
-        qNode.UL = cv::Point2i(num_node_pixel_x * static_cast<float>(i), 0);
-        qNode.UR = cv::Point2i(num_node_pixel_x * static_cast<float>(i + 1), 0);
-        qNode.BL = cv::Point2i(qNode.UL.x, roi_max_y - roi_min_y);
-        qNode.BR = cv::Point2i(qNode.UR.x, roi_max_y - roi_min_y);
+        quad_tree_node.UL = cv::Point2i(num_node_pixel_x * static_cast<float>(i), 0);
+        quad_tree_node.UR = cv::Point2i(num_node_pixel_x * static_cast<float>(i + 1), 0);
+        quad_tree_node.BL = cv::Point2i(quad_tree_node.UL.x, roi_max_y - roi_min_y);
+        quad_tree_node.BR = cv::Point2i(quad_tree_node.UR.x, roi_max_y - roi_min_y);
 
-        qNode.keypoints.reserve( keypoints_to_distribute_level_i.size() );
+        quad_tree_node.keypoints.reserve( keypoints_to_distribute_level_i.size() );
 
-        nodesList.push_back(qNode);
-        initialNodesPtrs[i] = &nodesList.back();
+        quad_tree_node_list.push_back(quad_tree_node);
+        quad_tree_roots_ptrs[i] = &quad_tree_node_list.back();
     }
 
 	// link points to child nodes
     for ( const auto& keypoints_to_distribute_j : keypoints_to_distribute_level_i )
     {
-        initialNodesPtrs[ keypoints_to_distribute_j.pt.x / num_node_pixel_x ]->keypoints.emplace_back( keypoints_to_distribute_j );
+        quad_tree_roots_ptrs[ keypoints_to_distribute_j.pt.x / num_node_pixel_x ]->keypoints.emplace_back( keypoints_to_distribute_j );
     }
 
     // traverse the quad tree nodes list, mark the nodes that no longer needs to be split, delete the nodes that did not 
-    // have a keypoint associated with it.
-    auto lit = nodesList.begin();
-    while (lit != nodesList.end())
+    // have a key points associated with it.
+    auto lit = quad_tree_node_list.begin();
+    while (lit != quad_tree_node_list.end())
     {
-
+        // mark the node as final if the initial node only have one key point associate with it
+		if (lit->keypoints.size() == 1)
+		{
+			lit->is_final = true;
+			lit++;
+		}
+		else if (lit->keypoints.empty())
+            // erase the node if no key point is associate with it
+			lit = quad_tree_node_list.erase(lit);
+		else
+            // update the iterator
+			lit++;
     }
 
-    bool bFinish = false;
+    // a flag use to mark if the distribution process is finished
+    bool is_finished = false;
 
-    std::vector<std::pair<int, QuadTreeNode*>> sizeAndPtr2Node;
-    sizeAndPtr2Node.reserve(nodesList.size() * 4);
+    // a vector use to hold the <number of key points belong to one node, quad tree node ptr> pair.
+    // we use this to discover which nodes can endure further divide
+    std::vector<std::pair<int, QuadTreeNode*>> node_keypoint_size_vs_node_ptr_pair;
+    node_keypoint_size_vs_node_ptr_pair.reserve(quad_tree_node_list.size() * 4);
 
-    while (!bFinish)
+    while (!is_finished)
     {
+        int previous_size = quad_tree_node_list.size();
 
+        lit = quad_tree_node_list.begin();
+
+        int expanded_nodes_counter = 0;
+
+        node_keypoint_size_vs_node_ptr_pair.clear();
+
+        while (lit != quad_tree_node_list.end())
+        {
+            if (lit->is_final)
+            {
+                lit++;
+                continue;
+            }
+            else
+            {
+                QuadTreeNode n1, n2, n3, n4;
+                lit->divide(n1, n2, n3, n4);
+
+                if (n1.keypoints.size() > 0)
+                {
+                    quad_tree_node_list.push_front(n1);
+                    if (n1.keypoints.size() > 1)
+                    {
+                        expanded_nodes_counter++;
+
+                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n1.keypoints.size(), &quad_tree_node_list.front()));
+
+                        quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                    }
+                }
+                if (n2.keypoints.size() > 0)
+                {
+                    quad_tree_node_list.push_front(n2);
+                    if (n2.keypoints.size() > 1)
+                    {
+                        expanded_nodes_counter++;
+                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n2.keypoints.size(), &quad_tree_node_list.front()));
+                        quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                    }
+                }
+                if (n3.keypoints.size() > 0)
+                {
+                    quad_tree_node_list.push_front(n3);
+                    if (n3.keypoints.size() > 1)
+                    {
+                        expanded_nodes_counter++;
+                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n3.keypoints.size(), &quad_tree_node_list.front()));
+                        quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                    }
+                }
+                if (n4.keypoints.size() > 0)
+                {
+                    quad_tree_node_list.push_front(n4);
+                    if (n4.keypoints.size() > 1)
+                    {
+                        expanded_nodes_counter++;
+                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n4.keypoints.size(), &quad_tree_node_list.front()));
+                        quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                    }
+                }
+
+                lit = quad_tree_node_list.erase(lit);
+            }
+        }
+
+        if ((int)quad_tree_node_list.size() >= num_feature_level_i || (int)quad_tree_node_list.size() == previous_size)
+        {
+            is_finished = true;
+        }
+
+        else if (((int)quad_tree_node_list.size() + expanded_nodes_counter * 3) > num_feature_level_i)
+        {
+            while (!is_finished)
+            {
+                previous_size = quad_tree_node_list.size();
+
+                std::vector<pair<int, QuadTreeNode*> > prev_node_keypoint_size_vs_node_ptr_pair = node_keypoint_size_vs_node_ptr_pair;
+                node_keypoint_size_vs_node_ptr_pair.clear();
+
+                sort(prev_node_keypoint_size_vs_node_ptr_pair.begin(), prev_node_keypoint_size_vs_node_ptr_pair.end());
+
+                for (int j = prev_node_keypoint_size_vs_node_ptr_pair.size() - 1; j >= 0; j--)
+                {
+                    QuadTreeNode n1, n2, n3, n4;
+                    prev_node_keypoint_size_vs_node_ptr_pair[j].second->divide(n1, n2, n3, n4);
+
+                    if (n1.keypoints.size() > 0)
+                    {
+                        quad_tree_node_list.push_front(n1);
+                        if (n1.keypoints.size() > 1)
+                        {
+                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n1.keypoints.size(), &quad_tree_node_list.front()));
+                            quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                        }
+                    }
+                    if (n2.keypoints.size() > 0)
+                    {
+                        quad_tree_node_list.push_front(n2);
+                        if (n2.keypoints.size() > 1)
+                        {
+                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n2.keypoints.size(), &quad_tree_node_list.front()));
+                            quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                        }
+                    }
+                    if (n3.keypoints.size() > 0)
+                    {
+                        quad_tree_node_list.push_front(n3);
+                        if (n3.keypoints.size() > 1)
+                        {
+                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n3.keypoints.size(), &quad_tree_node_list.front()));
+                            quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                        }
+                    }
+                    if (n4.keypoints.size() > 0)
+                    {
+                        quad_tree_node_list.push_front(n4);
+                        if (n4.keypoints.size() > 1)
+                        {
+                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n4.keypoints.size(), &quad_tree_node_list.front()));
+                            quad_tree_node_list.front().lit = quad_tree_node_list.begin();
+                        }
+                    }
+
+                    quad_tree_node_list.erase(prev_node_keypoint_size_vs_node_ptr_pair[j].second->lit);
+
+                    if ((int)quad_tree_node_list.size() >= num_feature_level_i)
+                        break;
+                }
+
+                if ((int)quad_tree_node_list.size() >= num_feature_level_i || (int)quad_tree_node_list.size() == previous_size)
+                    is_finished = true;
+            }
+        }
     }
 
-    for (auto lit = nodesList.begin(); lit != nodesList.end(); lit++)
+    for (auto lit = quad_tree_node_list.begin(); lit != quad_tree_node_list.end(); lit++)
     {
-
         // NOTE: add to `keypoints_level_i` directly
+		std::vector<cv::KeyPoint>& keypoints_of_this_node = lit->keypoints;
+        cv::KeyPoint* best_keypoint = &keypoints_of_this_node;
+
+        float max_response = best_keypoint->response;
+
+        for (size_t k = 1; k < keypoints_of_this_node.size(); k++)
+        {
+            if (keypoints_of_this_node[k].response > max_response)
+            {
+                best_keypoint = &keypoints_of_this_node[k];
+                max_response = keypoints_of_this_node[k].response;
+            }
+        }
+
+        keypoints_level_i.push_back(*best_keypoint);
     }
 }
 
