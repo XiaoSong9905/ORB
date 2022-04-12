@@ -616,8 +616,8 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
                 // adaptive methods, if default threshold do not detect any feature, try lower threshold
                 // If still unable to detect any keypoint, give up
                 if ( curr_cell_keypoints.empty() )
-					cv::FAST( pyramid_scaled_image[ level_i ].rowRange( cell_y_i_start, cell_y_i_end).colRange( cell_x_j_start, cell_x_j_end ), \
-						curr_cell_keypoints, fast_min_threshold, true );
+                    cv::FAST( pyramid_scaled_image[ level_i ].rowRange( cell_y_i_start, cell_y_i_end).colRange( cell_x_j_start, cell_x_j_end ), \
+                        curr_cell_keypoints, fast_min_threshold, true );
 
                 if ( !curr_cell_keypoints.empty() )
                 {
@@ -749,7 +749,7 @@ void ORBDetectorDescriptor::computeBRISKDescriptorsPerPyramidLevel( \
 
             t0 = ORB_BRISK_GET_PATTERN( 14 ); 
             t1 = ORB_BRISK_GET_PATTERN( 15 );
-            val |= (t0 < t1) << 7;				
+            val |= (t0 < t1) << 7;                
 
             descriptors.ptr(keypoint_idx)[ i ] = (uchar)val;
         }
@@ -851,7 +851,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
         quad_tree_roots_ptrs[i] = &quad_tree_node_list.back();
     }
 
-	// link points to child nodes
+    // link points to child nodes
     for ( const auto& keypoints_to_distribute_j : keypoints_to_distribute_level_i )
     {
         quad_tree_roots_ptrs[ keypoints_to_distribute_j.pt.x / num_node_pixel_x ]->keypoints.emplace_back( keypoints_to_distribute_j );
@@ -863,17 +863,17 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
     while (lit != quad_tree_node_list.end())
     {
         // mark the node as final if the initial node only have one key point associate with it
-		if (lit->keypoints.size() == 1)
-		{
-			lit->is_final = true;
-			lit++;
-		}
-		else if (lit->keypoints.empty())
+        if (lit->keypoints.size() == 1)
+        {
+            lit->is_final = true;
+            lit++;
+        }
+        else if (lit->keypoints.empty())
             // erase the node if no key point is associate with it
-			lit = quad_tree_node_list.erase(lit);
-		else
+            lit = quad_tree_node_list.erase(lit);
+        else
             // update the iterator
-			lit++;
+            lit++;
     }
 
     // a flag use to mark if the distribution process is finished
@@ -1026,7 +1026,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
     for (auto lit = quad_tree_node_list.begin(); lit != quad_tree_node_list.end(); lit++)
     {
         // NOTE: add to `keypoints_level_i` directly
-		std::vector<cv::KeyPoint>& keypoints_of_this_node = lit->keypoints;
+        std::vector<cv::KeyPoint>& keypoints_of_this_node = lit->keypoints;
         cv::KeyPoint* best_keypoint = &keypoints_of_this_node[0];
 
         float max_response = best_keypoint->response;
@@ -1060,28 +1060,28 @@ void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, 
 
     // update the boundaries value for the child nodes
     // node one, stores the upper left area
-	n1.UL = this->UL;
-	n1.UR = cv::Point2i(UL.x + half_width_x, UL.y);
-	n1.BL = cv::Point2i(UL.x, UL.y + half_height_y);
-	n1.BR = cv::Point2i(UL.x + half_width_x, UL.y + half_height_y);
+    n1.UL = this->UL;
+    n1.UR = cv::Point2i(UL.x + half_width_x, UL.y);
+    n1.BL = cv::Point2i(UL.x, UL.y + half_height_y);
+    n1.BR = cv::Point2i(UL.x + half_width_x, UL.y + half_height_y);
 
     // node two, stores the upper right area
-	n2.UL = n1.UR;
-	n2.UR = this->UR;
-	n2.BL = n1.BR;
-	n2.BR = cv::Point2i(UR.x, UL.y + half_height_y);
-	
+    n2.UL = n1.UR;
+    n2.UR = this->UR;
+    n2.BL = n1.BR;
+    n2.BR = cv::Point2i(UR.x, UL.y + half_height_y);
+    
     // node three, stores the bottom left area
-	n3.UL = n1.BL;
-	n3.UR = n1.BR;
-	n3.BL = this->BL;
-	n3.BR = cv::Point2i(n1.BR.x, BL.y);
+    n3.UL = n1.BL;
+    n3.UR = n1.BR;
+    n3.BL = this->BL;
+    n3.BR = cv::Point2i(n1.BR.x, BL.y);
 
     // node four, stores the bottom right area
-	n4.UL = n3.UR;
-	n4.UR = n2.BR;
-	n4.BL = n3.BR;
-	n4.BR = this->BR;
+    n4.UL = n3.UR;
+    n4.UR = n2.BR;
+    n4.BL = n3.BR;
+    n4.BR = this->BR;
 
     // reserve the space for storing key points
     n1.keypoints.reserve(this->keypoints.size());
@@ -1099,10 +1099,10 @@ void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, 
         // assign it to the correct new nodes
         if (keypoint_reference.pt.x < n1.UR.x)
         {
-			if (keypoint_reference.pt.y < n1.BR.y)
-				n1.keypoints.push_back(keypoint_reference);
-			else
-				n3.keypoints.push_back(keypoint_reference);
+            if (keypoint_reference.pt.y < n1.BR.y)
+                n1.keypoints.push_back(keypoint_reference);
+            else
+                n3.keypoints.push_back(keypoint_reference);
         }
         else if (keypoint_reference.pt.y < n1.BR.y)
         {
@@ -1118,12 +1118,12 @@ void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, 
     // if the amount == 1, we mark the node as final and stop further divide it
     if (n1.keypoints.size() == 1)
         n1.is_final = true;
-	if (n2.keypoints.size() == 1)
-		n2.is_final = true;
-	if (n3.keypoints.size() == 1)
-		n3.is_final = true;
-	if (n4.keypoints.size() == 1)
-		n4.is_final = true;
+    if (n2.keypoints.size() == 1)
+        n2.is_final = true;
+    if (n3.keypoints.size() == 1)
+        n3.is_final = true;
+    if (n4.keypoints.size() == 1)
+        n4.is_final = true;
 }
 
 } // namespace orb
