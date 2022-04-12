@@ -11,6 +11,8 @@
 #include <opencv2/features2d.hpp>
 #include <brisk/brisk.h>
 
+// This file is no longer useful, just keep here in case there is something wrong in the code of compare.cc 
+
 int main ( int argc, char** argv )
 {
     if ( argc != 3 )
