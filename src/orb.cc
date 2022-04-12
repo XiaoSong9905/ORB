@@ -913,7 +913,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                     {
                         expanded_nodes_counter++;
 
-                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n1.keypoints.size(), &quad_tree_node_list.front()));
+                        node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n1.keypoints.size(), &quad_tree_node_list.front()));
 
                         quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                     }
@@ -924,7 +924,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                     if (n2.keypoints.size() > 1)
                     {
                         expanded_nodes_counter++;
-                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n2.keypoints.size(), &quad_tree_node_list.front()));
+                        node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n2.keypoints.size(), &quad_tree_node_list.front()));
                         quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                     }
                 }
@@ -934,7 +934,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                     if (n3.keypoints.size() > 1)
                     {
                         expanded_nodes_counter++;
-                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n3.keypoints.size(), &quad_tree_node_list.front()));
+                        node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n3.keypoints.size(), &quad_tree_node_list.front()));
                         quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                     }
                 }
@@ -944,7 +944,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                     if (n4.keypoints.size() > 1)
                     {
                         expanded_nodes_counter++;
-                        node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n4.keypoints.size(), &quad_tree_node_list.front()));
+                        node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n4.keypoints.size(), &quad_tree_node_list.front()));
                         quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                     }
                 }
@@ -964,7 +964,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
             {
                 previous_size = quad_tree_node_list.size();
 
-                std::vector<pair<int, QuadTreeNode*> > prev_node_keypoint_size_vs_node_ptr_pair = node_keypoint_size_vs_node_ptr_pair;
+                std::vector<std::pair<int, QuadTreeNode*> > prev_node_keypoint_size_vs_node_ptr_pair = node_keypoint_size_vs_node_ptr_pair;
                 node_keypoint_size_vs_node_ptr_pair.clear();
 
                 sort(prev_node_keypoint_size_vs_node_ptr_pair.begin(), prev_node_keypoint_size_vs_node_ptr_pair.end());
@@ -979,7 +979,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                         quad_tree_node_list.push_front(n1);
                         if (n1.keypoints.size() > 1)
                         {
-                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n1.keypoints.size(), &quad_tree_node_list.front()));
+                            node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n1.keypoints.size(), &quad_tree_node_list.front()));
                             quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                         }
                     }
@@ -988,7 +988,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                         quad_tree_node_list.push_front(n2);
                         if (n2.keypoints.size() > 1)
                         {
-                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n2.keypoints.size(), &quad_tree_node_list.front()));
+                            node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n2.keypoints.size(), &quad_tree_node_list.front()));
                             quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                         }
                     }
@@ -997,7 +997,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                         quad_tree_node_list.push_front(n3);
                         if (n3.keypoints.size() > 1)
                         {
-                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n3.keypoints.size(), &quad_tree_node_list.front()));
+                            node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n3.keypoints.size(), &quad_tree_node_list.front()));
                             quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                         }
                     }
@@ -1006,7 +1006,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                         quad_tree_node_list.push_front(n4);
                         if (n4.keypoints.size() > 1)
                         {
-                            node_keypoint_size_vs_node_ptr_pair.push_back(make_pair(n4.keypoints.size(), &quad_tree_node_list.front()));
+                            node_keypoint_size_vs_node_ptr_pair.push_back(std::make_pair(n4.keypoints.size(), &quad_tree_node_list.front()));
                             quad_tree_node_list.front().lit = quad_tree_node_list.begin();
                         }
                     }
@@ -1027,7 +1027,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
     {
         // NOTE: add to `keypoints_level_i` directly
 		std::vector<cv::KeyPoint>& keypoints_of_this_node = lit->keypoints;
-        cv::KeyPoint* best_keypoint = &keypoints_of_this_node;
+        cv::KeyPoint* best_keypoint = &keypoints_of_this_node[0];
 
         float max_response = best_keypoint->response;
 
