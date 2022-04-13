@@ -10,6 +10,7 @@
 #include <opencv2/opencv.hpp> // cv::Mat
 #include <opencv2/features2d.hpp>
 #include <brisk/brisk.h>
+#include <orb/orb.h> // Our own ORB package
 
 int main ( int argc, char** argv )
 {
