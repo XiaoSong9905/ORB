@@ -36,5 +36,7 @@ find_package( orb REQUIRED )
 include_directories( BEFORE ${ORB_INCLUDE_DIRS} )
 message( STATUS "Found ORB: ${ORB_INCLUDE_DIRS} ${ORB_LIBRARIES}")
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR} )
+
 add_executable( demo demo.cc  )
 target_link_libraries( demo PRIVATE ${OpenCV_LIBS} ${ORB_LIBRARIES})
