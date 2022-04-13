@@ -341,6 +341,7 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
     tmp_brisk_random_pattern.swap( brisk_random_pattern );
 
     /* Rotation setting */
+    patch_umax.resize( HALF_EXTRACTOR_PATCH_SIZE + 1 );
     int v;
     int v0;
     int vmax = cvFloor( HALF_EXTRACTOR_PATCH_SIZE * sqrt(2.f) / 2 + 1 );
@@ -383,7 +384,7 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
     // No input image, return
     if ( _image.empty() )
     {
-        return;
+        throw std::runtime_error("ORBDetectorDescriptor::detectAndCompute input image is empty\n");
     }
 
     // Require grayscale uint8
