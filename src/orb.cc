@@ -502,8 +502,11 @@ cv::String ORBDetectorDescriptor::getDefaultName() const
  */
 void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 {
+
     for (int level_i = 0; level_i < pyramid_num_level; ++level_i) 
     {
+        printf("level %d/%d begin\n", level_i, pyramid_num_level ); fflush(stdout);
+    
         float level_i_inv_scale = pyramid_inv_scale_factors[ level_i ];
 
         cv::Size level_i_scale_size( cvRound((float) image.cols * level_i_inv_scale ), \
@@ -549,7 +552,11 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
                 PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, \
                 cv::BorderTypes::BORDER_REFLECT_101 );
         }
+
+        printf("level %d/%d finish\n", level_i, pyramid_num_level ); fflush(stdout);
     }
+
+    printf("compute pyramid end\n"); fflush(stdout);
 }
 
 
@@ -681,6 +688,8 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
             keypoints_level_i_j.size = patch_size_level_i;
         }
     } // end of level i
+
+    printf("computeFASTKeyPointQuadTree end\n"); fflush(stdout);
 }
 
 
@@ -774,6 +783,9 @@ void ORBDetectorDescriptor::computeBRISKDescriptorsPerPyramidLevel( \
             descriptors.ptr(keypoint_idx)[ i ] = (uchar)val;
         }
     }
+    
+    printf("computeBRISKDescriptorsPerPyramidLevel end\n"); fflush(stdout);
+
 }
 
 
@@ -827,6 +839,8 @@ void ORBDetectorDescriptor::computeOrientation( \
 
         } // end for every keypoint
     } // end for every layer
+
+    printf("computeOrientation end\n"); fflush(stdout);
 }
 
 /**
@@ -1062,6 +1076,8 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
 
         keypoints_level_i.push_back(*best_keypoint);
     }
+
+    printf("QuadTreeDistributePerPyramidLevel end\n"); fflush(stdout);
 }
 
 /**
