@@ -8,7 +8,6 @@
 #include <vector>
 #include <memory> // shared_ptr
 #include <opencv2/opencv.hpp> // cv::Mat
-
 #include <orb/orb.h> // Our own ORB package
 
 int main ( int argc, char** argv )

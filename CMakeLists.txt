@@ -51,7 +51,7 @@ else()
 endif()
 
 # require OpenCV
-find_package( OpenCV REQUIRED )
+find_package( OpenCV 3.4.0 REQUIRED )
 include_directories(BEFORE ${OpenCV_INCLUDE_DIRS} )
 
 # Arm / X86 optimize flag

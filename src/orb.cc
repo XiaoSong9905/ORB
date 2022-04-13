@@ -296,7 +296,7 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
     fast_default_threshold( _fast_default_threshold ), \
     fast_min_threshold( _fast_min_threshold )
 {
-    /* image pyramid setting */
+    /* Image pyramid setting */
     float pyramid_inv_scale_factor = 1.0f / pyramid_scale_factor;
 
     // Scaling factor for each layer
@@ -341,7 +341,24 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
     tmp_brisk_random_pattern.swap( brisk_random_pattern );
 
     /* Rotation setting */
-    // TODO @Tiancheng add patch_umax setting below
+    int v;
+    int v0;
+    int vmax = cvFloor( HALF_EXTRACTOR_PATCH_SIZE * sqrt(2.f) / 2 + 1 );
+    int vmin = cvCeil( HALF_EXTRACTOR_PATCH_SIZE * sqrt(2.f) / 2);
+    const double HALF_EXTRACTOR_PATCH_SIZE_SQR = HALF_EXTRACTOR_PATCH_SIZE * HALF_EXTRACTOR_PATCH_SIZE ;
+
+    for (v = 0; v <= vmax; ++v)
+    {
+        patch_umax[ v ] = cvRound( sqrt(HALF_EXTRACTOR_PATCH_SIZE_SQR - v * v) );
+    }
+    
+	for (v = HALF_EXTRACTOR_PATCH_SIZE, v0 = 0; v >= vmin; --v)
+    {
+        while ( patch_umax[ v0 ] == patch_umax[ v0 + 1 ])
+            ++v0;
+        patch_umax[ v ] = v0;
+        ++v0;
+    }
 }
 
 
@@ -414,8 +431,10 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
         descriptors = _descriptors.getMat();
     }
 
-    std::vector<cv::KeyPoint> tmp_keypoints; 
-    tmp_keypoints.reserve( total_num_features );
+    //std::vector<cv::KeyPoint> tmp_keypoints; 
+    //tmp_keypoints.reserve( total_num_features );
+    _keypoints.clear();
+    _keypoints.reserve( total_num_features );
 
     // For every pyramid layer, Gaussian blur & compute descriptor
     int keypoints_cnt = 0;
@@ -451,7 +470,7 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
             keypoints_level_i[ keypoint_level_i_index ].pt *= scale_factor_level_i;
 
             // Add to keypoints container
-            tmp_keypoints.emplace_back( keypoints_level_i[ keypoint_level_i_index ] );
+            _keypoints.emplace_back( keypoints_level_i[ keypoint_level_i_index ] );
 
             // Add to descriptor matrix
             descriptors_level_i.row( keypoint_level_i_index ).copyTo( descriptors.row( keypoints_cnt ) );
@@ -460,7 +479,7 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
     }
 
     // Swap keypoints container
-    tmp_keypoints.swap( _keypoints );
+    //tmp_keypoints.swap( _keypoints );
 }
 
 

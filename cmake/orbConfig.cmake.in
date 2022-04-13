@@ -2,7 +2,6 @@
 # It defines the following variables
 #  ORB_INCLUDE_DIRS - include directories for FooBar
 #  ORB_LIBRARIES    - libraries to link against
-#  ORB_EXECUTABLE   - the okvis_app_synchronous executable
  
 # Compute paths
 get_filename_component(ORB_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
@@ -13,4 +12,5 @@ if(NOT TARGET ORB AND NOT ORB_BINARY_DIR)
   include("${ORB_CMAKE_DIR}/orbTargets.cmake")
 endif()
  
-
+# library
+set(ORB_LIBRARIES orb )
