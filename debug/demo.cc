@@ -27,11 +27,22 @@ int main ( int argc, char** argv )
         exit(1);
     }
 
+    // Resize image to 640, 480 to match intel realsense input
+    cv::resize(image1, image1, cv::Size(640, 480), cv::INTER_LINEAR);
+    cv::resize(image2, image2, cv::Size(640, 480), cv::INTER_LINEAR);
+
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
     cv::Mat descriptors1, descriptors2;
 
     printf("Build our own ORB feature detector\n"); fflush( stdout );
-    orb::ORBDetectorDescriptor orb_feature{ 100, 0.5, 10, 5, 2 }; // NOTE: those value are just random value used to compile the program
+
+    int num_features = 1200;
+    float pyramid_scale_factor = 1.2f;
+    int pyramid_num_level = 8;
+    int fast_default_threshold = 20;
+    int fast_min_threshold  = 7;
+
+    orb::ORBDetectorDescriptor orb_feature{ num_features, pyramid_scale_factor, pyramid_num_level, fast_default_threshold, fast_min_threshold };
     
     printf("Run detect and compute\n"); fflush( stdout );
     orb_feature.detectAndCompute( image1, cv::noArray(), keypoints1, descriptors1 );

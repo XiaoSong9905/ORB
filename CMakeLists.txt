@@ -13,7 +13,6 @@ set(ORB_VERSION ${ORB_MAJOR_VERSION}.${ORB_MINOR_VERSION}.${ORB_PATCH_VERSION})
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++14 -fPIC")
 
 # Offer the user the choice of overriding the installation directories
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
@@ -52,7 +51,7 @@ endif()
 
 # require OpenCV
 find_package( OpenCV 3.4.0 REQUIRED )
-include_directories(BEFORE ${OpenCV_INCLUDE_DIRS} )
+include_directories( BEFORE ${OpenCV_INCLUDE_DIRS} )
 
 # Arm / X86 optimize flag
 if(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "arm*")

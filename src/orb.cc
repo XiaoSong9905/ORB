@@ -307,8 +307,8 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
     pyramid_inv_scale_factors[ 0 ] = 1.0f;
     for ( int level_i = 1; level_i < pyramid_num_level; ++level_i )
     {
-        pyramid_scale_factors[ level_i ] = pyramid_scale_factors[ level_i - 1 ] * pyramid_scale_factor;
-        pyramid_inv_scale_factors[ level_i ] = 1.0f / pyramid_scale_factors[ level_i ];
+        pyramid_scale_factors.at( level_i ) = pyramid_scale_factors.at( level_i - 1 ) * pyramid_scale_factor;
+        pyramid_inv_scale_factors.at( level_i ) = 1.0f / pyramid_scale_factors.at( level_i );
     }
 
     pyramid_scaled_image.resize( pyramid_num_level );
@@ -325,12 +325,12 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
     int num_features_cnt = 0;
     for ( int level_i = 0; level_i < pyramid_num_level - 1; level_i++ )
     {
-        pyramid_num_features_per_level[ level_i ] = cvRound( num_features_per_level );
-        num_features_cnt += pyramid_num_features_per_level[ level_i ];
+        pyramid_num_features_per_level.at( level_i ) = cvRound( num_features_per_level );
+        num_features_cnt += pyramid_num_features_per_level.at( level_i );
         num_features_per_level *= pyramid_inv_scale_factor;
     }
     // Set remaining feature points to last level
-    pyramid_num_features_per_level[ pyramid_num_level - 1 ] = std::max( num_features - num_features_cnt, 0 );
+    pyramid_num_features_per_level.at( pyramid_num_level - 1 ) = std::max( num_features - num_features_cnt, 0 );
     
     /* BRISK setting */
 
@@ -350,14 +350,14 @@ ORBDetectorDescriptor::ORBDetectorDescriptor( int _num_features, \
 
     for (v = 0; v <= vmax; ++v)
     {
-        patch_umax[ v ] = cvRound( sqrt(HALF_EXTRACTOR_PATCH_SIZE_SQR - v * v) );
+        patch_umax.at( v ) = cvRound( sqrt(HALF_EXTRACTOR_PATCH_SIZE_SQR - v * v) );
     }
     
 	for (v = HALF_EXTRACTOR_PATCH_SIZE, v0 = 0; v >= vmin; --v)
     {
-        while ( patch_umax[ v0 ] == patch_umax[ v0 + 1 ])
+        while ( patch_umax.at( v0 ) == patch_umax.at( v0 + 1 ))
             ++v0;
-        patch_umax[ v ] = v0;
+        patch_umax.at( v ) = v0;
         ++v0;
     }
 }
@@ -441,26 +441,28 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
     int keypoints_cnt = 0;
     for ( int level_i = 0; level_i < pyramid_num_level; ++level_i )
     {
-        std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level[ level_i ];
+        printf("begin level %d/%d\n", level_i, pyramid_num_level );
+    
+        std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level.at( level_i );
         int num_keypoints_level_i = keypoints_level_i.size();
         if ( num_keypoints_level_i == 0 )
             continue;
 
         // NOTE: unlinke ORBextractor.cc that clone an image mat and gaussian blur on top
         // we gaussian blur on pyramid_scaled_image content directely to reduce memory footprint.
-        cv::GaussianBlur( pyramid_scaled_image[ level_i ], \
-                          pyramid_scaled_image[ level_i ], \
+        cv::GaussianBlur( pyramid_scaled_image.at( level_i ), \
+                          pyramid_scaled_image.at( level_i ), \
                           cv::Size( 7, 7 ), 2, 2, cv::BORDER_REFLECT_101 );
 
         cv::Mat descriptors_level_i( num_keypoints_level_i, 32, CV_8U );
         
         // NOTE: this function is now a member function and can access briskPattern directely.
         computeBRISKDescriptorsPerPyramidLevel( \
-            pyramid_scaled_image[ level_i ], \
+            pyramid_scaled_image.at( level_i ), \
             keypoints_level_i, \
             descriptors_level_i );
 
-        const float scale_factor_level_i = pyramid_scale_factors[ level_i ];
+        const float scale_factor_level_i = pyramid_scale_factors.at( level_i );
 
         // Add keypoints & descriptor to container
         for ( int keypoint_level_i_index = 0; \
@@ -468,19 +470,18 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
                   keypoint_level_i_index++ )
         {
             // Scale level_i keypoints to original
-            keypoints_level_i[ keypoint_level_i_index ].pt *= scale_factor_level_i;
+            keypoints_level_i.at( keypoint_level_i_index ).pt *= scale_factor_level_i;
 
             // Add to keypoints container
-            _keypoints.emplace_back( keypoints_level_i[ keypoint_level_i_index ] );
+            _keypoints.emplace_back( keypoints_level_i.at( keypoint_level_i_index ) );
 
             // Add to descriptor matrix
             descriptors_level_i.row( keypoint_level_i_index ).copyTo( descriptors.row( keypoints_cnt ) );
             keypoints_cnt++;
         }
-    }
 
-    // Swap keypoints container
-    //tmp_keypoints.swap( _keypoints );
+        printf("end level %d/%d\n", level_i, pyramid_num_level );
+    }
 }
 
 
@@ -504,10 +505,8 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
 {
 
     for (int level_i = 0; level_i < pyramid_num_level; ++level_i) 
-    {
-        printf("level %d/%d begin\n", level_i, pyramid_num_level ); fflush(stdout);
-    
-        float level_i_inv_scale = pyramid_inv_scale_factors[ level_i ];
+    {    
+        float level_i_inv_scale = pyramid_inv_scale_factors.at( level_i );
 
         cv::Size level_i_scale_size( cvRound((float) image.cols * level_i_inv_scale ), \
                                      cvRound((float) image.rows * level_i_inv_scale ));
@@ -524,7 +523,7 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
         // `pyramid_scaled_image[ level_i ]` point to the region of interest specified by cv::Rect
         // when the for loop finish, `tmp_image` out of scope, the reference count to that particular data - 1
         // but the `pyramid_scaled_image[ level_i ]` still point to that data
-        pyramid_scaled_image[ level_i ] = tmp_image( cv::Rect( PYRAMID_EDGE_SIZE, \
+        pyramid_scaled_image.at( level_i ) = tmp_image( cv::Rect( PYRAMID_EDGE_SIZE, \
                                                                PYRAMID_EDGE_SIZE, \
                                                                level_i_scale_size.width, \
                                                                level_i_scale_size.height ) );
@@ -534,14 +533,14 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
         if ( level_i != 0) 
         {
             // Use previous layer + resize to generate current layer
-            cv::resize( pyramid_scaled_image[ level_i -1 ], \
-                        pyramid_scaled_image[ level_i ], \
+            cv::resize( pyramid_scaled_image.at( level_i -1 ), \
+                        pyramid_scaled_image.at( level_i ), \
                         level_i_scale_size, 0, 0, cv::INTER_LINEAR );
 
             // Padding the resized to tmp
             // https://docs.opencv.org/3.4/dc/da3/tutorial_copyMakeBorder.html
             // Below line change data in tmp_image, and thus change the `pyramid_scaled_image[ level_i ]` that share the same data
-            cv::copyMakeBorder( pyramid_scaled_image[ level_i ], tmp_image, \
+            cv::copyMakeBorder( pyramid_scaled_image.at(  level_i ), tmp_image, \
                 PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, \
                 cv::BorderTypes::BORDER_REFLECT_101 + cv::BorderTypes::BORDER_ISOLATED);
         }
@@ -552,11 +551,9 @@ void ORBDetectorDescriptor::computePyramid( const cv::Mat& image )
                 PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, PYRAMID_EDGE_SIZE, \
                 cv::BorderTypes::BORDER_REFLECT_101 );
         }
-
-        printf("level %d/%d finish\n", level_i, pyramid_num_level ); fflush(stdout);
     }
 
-    printf("compute pyramid end\n"); fflush(stdout);
+    printf("computePyramid end\n"); fflush(stdout);
 }
 
 
@@ -584,8 +581,8 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
         // FAST run in radious of 3, thus we can't run fast starting from the (0,0) boundary
         const int roi_min_x = PYRAMID_EDGE_SIZE - 3; // 3 is the radius set for the FAST calculation 
         const int roi_min_y = PYRAMID_EDGE_SIZE - 3;
-        const int roi_max_x = pyramid_scaled_image[ level_i ].cols - roi_min_x;
-        const int roi_max_y = pyramid_scaled_image[ level_i ].rows - roi_min_x;
+        const int roi_max_x = pyramid_scaled_image.at( level_i ).cols - roi_min_x;
+        const int roi_max_y = pyramid_scaled_image.at( level_i ).rows - roi_min_x;
 
         const int roi_range_x = roi_max_x - roi_min_x;
         const int roi_range_y = roi_max_y - roi_min_y;
@@ -637,13 +634,13 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
 
                 // OpenCV's FAST detector, first try, with higher threshold.
                 // use rowRange colRange to specify only run on the current grid part
-                cv::FAST( pyramid_scaled_image[ level_i ].rowRange( cell_y_i_start, cell_y_i_end ).colRange( cell_x_j_start, cell_x_j_end ), \
+                cv::FAST( pyramid_scaled_image.at( level_i ).rowRange( cell_y_i_start, cell_y_i_end ).colRange( cell_x_j_start, cell_x_j_end ), \
                     curr_cell_keypoints, fast_default_threshold, true );
 
                 // adaptive methods, if default threshold do not detect any feature, try lower threshold
                 // If still unable to detect any keypoint, give up
                 if ( curr_cell_keypoints.empty() )
-                    cv::FAST( pyramid_scaled_image[ level_i ].rowRange( cell_y_i_start, cell_y_i_end).colRange( cell_x_j_start, cell_x_j_end ), \
+                    cv::FAST( pyramid_scaled_image.at( level_i ).rowRange( cell_y_i_start, cell_y_i_end).colRange( cell_x_j_start, cell_x_j_end ), \
                         curr_cell_keypoints, fast_min_threshold, true );
 
                 if ( !curr_cell_keypoints.empty() )
@@ -662,8 +659,8 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
         } // end iterate cell y
 
         // store a reference to all the keypoints that belongs to the current layer
-        std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level[ level_i ];
-        keypoints_level_i.reserve( pyramid_num_features_per_level[ level_i ] );
+        std::vector<cv::KeyPoint>& keypoints_level_i = pyramid_keypoints_per_level.at( level_i );
+        keypoints_level_i.reserve( pyramid_num_features_per_level.at( level_i ) );
 
         // NOTE: number of keypoints in `keypoints_to_distribute_level_i` may exceed the expected keypoints at current layer
         //      during the quad tree distribution process, we will eliminate those keypoints.
@@ -672,10 +669,10 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
             keypoints_level_i, \
             roi_min_x, roi_max_x, \
             roi_min_y, roi_max_y, \
-            pyramid_num_features_per_level[ level_i ], \
+            pyramid_num_features_per_level.at( level_i ), \
             level_i );
         
-        const int patch_size_level_i = EXTRACTOR_PATCH_SIZE * pyramid_scale_factors[ level_i ];
+        const int patch_size_level_i = EXTRACTOR_PATCH_SIZE * pyramid_scale_factors.at( level_i );
 
         // traverse all feature points and restore their coordinates under current layer
         // NOTE: coordinate is set to current layer, not the gloabl layer (layer 0)
@@ -720,7 +717,7 @@ void ORBDetectorDescriptor::computeBRISKDescriptorsPerPyramidLevel( \
         const cv::Point* brisk_random_pattern_ptr = brisk_random_pattern.data();
 
         // Get reference to keypoint
-        const cv::KeyPoint& keypoint_i = keypoints[ keypoint_idx ];
+        const cv::KeyPoint& keypoint_i = keypoints.at( keypoint_idx );
 
         // get the angle of the keypoint (and get the cos and sin value)
         float keypoint_i_angle = keypoint_i.angle * factorPi;
@@ -800,8 +797,8 @@ void ORBDetectorDescriptor::computeOrientation( \
     // Compute orientation for every level keypoints
     for ( int level_j = 0; level_j < pyramid_num_level; ++level_j )
     {
-        std::vector<cv::KeyPoint>& keypoints_level_j = pyramid_keypoints_per_level[ level_j ];
-        cv::Mat image_level_j = pyramid_scaled_image[ level_j ]; // reference to same underlying data, no copy
+        std::vector<cv::KeyPoint>& keypoints_level_j = pyramid_keypoints_per_level.at( level_j );
+        cv::Mat image_level_j = pyramid_scaled_image.at( level_j ); // reference to same underlying data, no copy
 
         // Compute rotation for every keypoints
         for ( auto& keypoint_i : keypoints_level_j )
@@ -821,7 +818,7 @@ void ORBDetectorDescriptor::computeOrientation( \
             for (int v = 1; v <= HALF_EXTRACTOR_PATCH_SIZE; ++v)
             {
                 int v_sum = 0;
-                int d = patch_umax[v];
+                int d = patch_umax.at( v );
                 for (int u = -d; u <= d; ++u)
                 {
                     int val_plus  = keypoint_i_img_center[u + v*img_step];
@@ -882,13 +879,13 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
         quad_tree_node.keypoints.reserve( keypoints_to_distribute_level_i.size() );
 
         quad_tree_node_list.push_back(quad_tree_node);
-        quad_tree_roots_ptrs[i] = &quad_tree_node_list.back();
+        quad_tree_roots_ptrs.at( i ) = &quad_tree_node_list.back();
     }
 
     // link points to child nodes
     for ( const auto& keypoints_to_distribute_j : keypoints_to_distribute_level_i )
     {
-        quad_tree_roots_ptrs[ keypoints_to_distribute_j.pt.x / num_node_pixel_x ]->keypoints.emplace_back( keypoints_to_distribute_j );
+        quad_tree_roots_ptrs.at( keypoints_to_distribute_j.pt.x / num_node_pixel_x )->keypoints.emplace_back( keypoints_to_distribute_j );
     }
 
     // traverse the quad tree nodes list, mark the nodes that no longer needs to be split, delete the nodes that did not 
@@ -1006,7 +1003,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                 for (int j = prev_node_keypoint_size_vs_node_ptr_pair.size() - 1; j >= 0; j--)
                 {
                     QuadTreeNode n1, n2, n3, n4;
-                    prev_node_keypoint_size_vs_node_ptr_pair[j].second->divide(n1, n2, n3, n4);
+                    prev_node_keypoint_size_vs_node_ptr_pair.at( j ).second->divide(n1, n2, n3, n4);
 
                     if (n1.keypoints.size() > 0)
                     {
@@ -1045,7 +1042,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
                         }
                     }
 
-                    quad_tree_node_list.erase(prev_node_keypoint_size_vs_node_ptr_pair[j].second->lit);
+                    quad_tree_node_list.erase(prev_node_keypoint_size_vs_node_ptr_pair.at( j ).second->lit);
 
                     if ((int)quad_tree_node_list.size() >= num_feature_level_i)
                         break;
@@ -1061,16 +1058,16 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
     {
         // NOTE: add to `keypoints_level_i` directly
         std::vector<cv::KeyPoint>& keypoints_of_this_node = lit->keypoints;
-        cv::KeyPoint* best_keypoint = &keypoints_of_this_node[0];
+        cv::KeyPoint* best_keypoint = &keypoints_of_this_node.at( 0 );
 
         float max_response = best_keypoint->response;
 
         for (size_t k = 1; k < keypoints_of_this_node.size(); k++)
         {
-            if (keypoints_of_this_node[k].response > max_response)
+            if (keypoints_of_this_node.at( k ).response > max_response)
             {
-                best_keypoint = &keypoints_of_this_node[k];
-                max_response = keypoints_of_this_node[k].response;
+                best_keypoint = &keypoints_of_this_node.at( k );
+                max_response = keypoints_of_this_node.at( k ).response;
             }
         }
 
