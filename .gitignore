@@ -205,6 +205,5 @@ cython_debug/
 
 
 # Build file
-examples/demo
+example/demo
 compare/compare
-debug/demo

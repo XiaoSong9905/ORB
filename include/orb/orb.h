@@ -59,11 +59,11 @@ class ORBDetectorDescriptor : public cv::Feature2D
          * @param _fast_default_threshold : default threshold used by fast
          * @param _fast_min_threshold : adaptive min threshold used by fast
          */
-        ORBDetectorDescriptor( int _num_features, \
-                               float pyramid_scale_factor, \
-                               int _pyramid_num_level, \
-                               int _fast_default_threshold, \
-                               int _fast_min_threshold );
+        ORBDetectorDescriptor( int _num_features = 500, \
+                               float pyramid_scale_factor = 1.2f, \
+                               int _pyramid_num_level = 8, \
+                               int _fast_default_threshold = 20, \
+                               int _fast_min_threshold = 7 );
 
         /**
          * @brief Destroy the ORBDetectorDescriptor object

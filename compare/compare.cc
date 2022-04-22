@@ -17,6 +17,10 @@ void detection_and_matching(char** argv) {
     cv::Mat image1 = cv::imread ( argv[1], cv::IMREAD_COLOR );
     cv::Mat image2 = cv::imread ( argv[2], cv::IMREAD_COLOR );
 
+    // Resize image to 640, 480 to match intel realsense input
+    cv::resize(image1, image1, cv::Size(640, 480), cv::INTER_LINEAR);
+    cv::resize(image2, image2, cv::Size(640, 480), cv::INTER_LINEAR);
+
     cv::Mat image1_grayscale;
     cv::Mat image2_grayscale;
 
@@ -42,12 +46,13 @@ void detection_and_matching(char** argv) {
     } 
     else if (type == "orb") {
         printf("Build our own ORB feature detector\n"); fflush( stdout );
-        int num_features = 1200;
-        float pyramid_scale_factor = 1.2f;
-        int pyramid_num_level = 8;
-        int fast_default_threshold = 20;
-        int fast_min_threshold  = 7;
-        orb::ORBDetectorDescriptor orb_feature{ num_features, pyramid_scale_factor, pyramid_num_level, fast_default_threshold, fast_min_threshold };
+        // Below are ORB default setting
+        // int num_features = 500;
+        // float pyramid_scale_factor = 1.2f;
+        // int pyramid_num_level = 8;
+        // int fast_default_threshold = 20;
+        // int fast_min_threshold  = 7;
+        orb::ORBDetectorDescriptor orb_feature{ };
         orb_feature.detectAndCompute( image1_grayscale, cv::noArray(), keypoints1, descriptors1 );
         orb_feature.detectAndCompute( image2_grayscale, cv::noArray(), keypoints2, descriptors2 );
     }
@@ -66,6 +71,10 @@ void detection_and_matching(char** argv) {
         descriptorExtractor->compute(image1_grayscale, keypoints1, descriptors1);
         descriptorExtractor->compute(image2_grayscale, keypoints2, descriptors2);
     }
+
+    // Info
+    printf("Image 1 detect %lu number of feature\n", keypoints1.size());
+    printf("Image 2 detect %lu number of feature\n", keypoints2.size());
 
     // Matching
     printf("Build opencv matcher\n"); fflush( stdout );
