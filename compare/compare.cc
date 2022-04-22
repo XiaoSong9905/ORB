@@ -26,7 +26,7 @@ void detection_and_matching(char** argv) {
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
     cv::Mat descriptors1, descriptors2;
     
-    std::string type{ argv[3] };
+    std::string type{ argv[4] };
     // detect and describe
     if (type == "orb_opencv") {
         printf("Build opencv ORB feature detector\n"); fflush( stdout );
@@ -42,7 +42,12 @@ void detection_and_matching(char** argv) {
     } 
     else if (type == "orb") {
         printf("Build our own ORB feature detector\n"); fflush( stdout );
-        orb::ORBDetectorDescriptor orb_feature{ 100, 0.5, 10, 5, 2 }; // NOTE: those value are just random value used to compile the program
+        int num_features = 1200;
+        float pyramid_scale_factor = 1.2f;
+        int pyramid_num_level = 8;
+        int fast_default_threshold = 20;
+        int fast_min_threshold  = 7;
+        orb::ORBDetectorDescriptor orb_feature{ num_features, pyramid_scale_factor, pyramid_num_level, fast_default_threshold, fast_min_threshold };
         orb_feature.detectAndCompute( image1_grayscale, cv::noArray(), keypoints1, descriptors1 );
         orb_feature.detectAndCompute( image2_grayscale, cv::noArray(), keypoints2, descriptors2 );
     }
@@ -74,14 +79,14 @@ void detection_and_matching(char** argv) {
     cv::drawMatches( image1, keypoints1, image2, keypoints2, matches, image_matches, \
         cv::Scalar(0, 255, 0), cv::Scalar(0, 0, 255), \
         std::vector<std::vector<char> >(), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-    cv::imwrite("match_image.png", image_matches);
+    cv::imwrite( argv[3], image_matches);
 }
 
 int main ( int argc, char** argv )
 {
-    if ( argc != 4 )
+    if ( argc != 5 )
     {
-        printf("Usage: ./demo PATH_TO_IMAGE1, PATH_TO_IMAGE2, DESCRIPTOR_TYPE\n");
+        printf("Usage: ./compare PATH_TO_IMAGE1 PATH_TO_IMAGE PATH_TO_OUTPUT_IMAGE DESCRIPTOR_TYPE\n");
         exit(1);
     }
 
