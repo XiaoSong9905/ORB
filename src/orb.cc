@@ -413,7 +413,7 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
     int total_num_features = 0;
     for ( int level_i = 0; level_i < pyramid_num_level; ++level_i )
     {
-        total_num_features += pyramid_keypoints_per_level.size();
+        total_num_features += pyramid_keypoints_per_level[ level_i ].size();
     }
 
     // No keypoints is detected across all layer of pyramid
@@ -448,7 +448,6 @@ void ORBDetectorDescriptor::detectAndCompute( cv::InputArray _image, \
         if ( num_keypoints_level_i == 0 )
             continue;
 
-        // NOTE: unlinke ORBextractor.cc that clone an image mat and gaussian blur on top
         // we gaussian blur on pyramid_scaled_image content directely to reduce memory footprint.
         cv::GaussianBlur( pyramid_scaled_image.at( level_i ), \
                           pyramid_scaled_image.at( level_i ), \
@@ -572,7 +571,7 @@ void ORBDetectorDescriptor::computeFASTKeyPointQuadTree( \
     // an adaptive threshold is used to extract FAST keypoint from every grid
 
     // cell size
-    const int cell_size = 30;
+    const int cell_size = 35;
 
     // itr through the whole pyramid and process each layer.
     for (int level_i = 0; level_i < pyramid_num_level; level_i++) 
@@ -1088,7 +1087,7 @@ void ORBDetectorDescriptor::QuadTreeDistributePerPyramidLevel( \
 void QuadTreeNode::divide(QuadTreeNode& n1, QuadTreeNode& n2, QuadTreeNode& n3, QuadTreeNode& n4)
 {
     // get the half width and half height value of the image area represented by current node
-    const int half_width_x = std::ceil(static_cast<float>(this->UR.x - this->UL.y) / 2);
+    const int half_width_x = std::ceil(static_cast<float>(this->UR.x - this->UL.x) / 2);
     const int half_height_y = std::ceil(static_cast<float>(this->BR.y - this->UL.y) / 2);
 
     // update the boundaries value for the child nodes
