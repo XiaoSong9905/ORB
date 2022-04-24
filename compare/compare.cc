@@ -80,22 +80,21 @@ void detection_and_matching(char** argv) {
     printf("Build opencv matcher\n"); fflush( stdout );
     cv::BFMatcher matcher;
     std::vector<std::vector<cv::DMatch>> matches;
-    matcher.radiusMatch( descriptors1, descriptors2, matches, 0.21 );
+    matcher.radiusMatch( descriptors1, descriptors2, matches, atoi(argv[5]) );
 
     // Draw matches
     printf("Draw matching\n"); fflush( stdout );
     cv::Mat image_matches;
     cv::drawMatches( image1, keypoints1, image2, keypoints2, matches, image_matches, \
-        cv::Scalar(0, 255, 0), cv::Scalar(0, 0, 255), \
-        std::vector<std::vector<char> >(), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+        cv::Scalar(0, 255, 0), cv::Scalar(0, 0, 255) );
     cv::imwrite( argv[3], image_matches);
 }
 
 int main ( int argc, char** argv )
 {
-    if ( argc != 5 )
+    if ( argc != 6 )
     {
-        printf("Usage: ./compare PATH_TO_IMAGE1 PATH_TO_IMAGE PATH_TO_OUTPUT_IMAGE DESCRIPTOR_TYPE\n");
+        printf("Usage: ./compare PATH_TO_IMAGE1 PATH_TO_IMAGE2 PATH_TO_OUTPUT_IMAGE DESCRIPTOR_TYPE MATCH_RADIOUS\n");
         exit(1);
     }
 
