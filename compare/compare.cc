@@ -80,7 +80,7 @@ void detection_and_matching(char** argv) {
     printf("Build opencv matcher\n"); fflush( stdout );
     cv::BFMatcher matcher;
     std::vector<std::vector<cv::DMatch>> matches;
-    matcher.radiusMatch( descriptors1, descriptors2, matches, atoi(argv[5]) );
+    matcher.radiusMatch( descriptors1, descriptors2, matches, 250 );
 
     // Draw matches
     printf("Draw matching\n"); fflush( stdout );
@@ -92,9 +92,9 @@ void detection_and_matching(char** argv) {
 
 int main ( int argc, char** argv )
 {
-    if ( argc != 6 )
+    if ( argc != 5 )
     {
-        printf("Usage: ./compare PATH_TO_IMAGE1 PATH_TO_IMAGE2 PATH_TO_OUTPUT_IMAGE DESCRIPTOR_TYPE MATCH_RADIOUS\n");
+        printf("Usage: ./compare PATH_TO_IMAGE1 PATH_TO_IMAGE2 PATH_TO_OUTPUT_IMAGE DESCRIPTOR_TYPE\n");
         exit(1);
     }
 
